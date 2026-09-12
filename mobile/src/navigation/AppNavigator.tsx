@@ -5,8 +5,7 @@ import { ActivityIndicator, View } from 'react-native';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
-import HomeScreen from '../screens/HomeScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import MainTabs from './MainTabs';
 import { useAuth } from '../context/AuthContext';
 
 export type AuthStackParamList = {
@@ -15,13 +14,7 @@ export type AuthStackParamList = {
   Signup: undefined;
 };
 
-export type MainStackParamList = {
-  Home: undefined;
-  Profile: undefined;
-};
-
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const MainStack = createNativeStackNavigator<MainStackParamList>();
 
 function AuthNavigator() {
   return (
@@ -30,15 +23,6 @@ function AuthNavigator() {
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Signup" component={SignupScreen} />
     </AuthStack.Navigator>
-  );
-}
-
-function MainNavigator() {
-  return (
-    <MainStack.Navigator>
-      <MainStack.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-      <MainStack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
-    </MainStack.Navigator>
   );
 }
 
@@ -53,9 +37,5 @@ export default function AppNavigator() {
     );
   }
 
-  return (
-    <NavigationContainer>
-      {user ? <MainNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
-  );
+  return <NavigationContainer>{user ? <MainTabs /> : <AuthNavigator />}</NavigationContainer>;
 }
