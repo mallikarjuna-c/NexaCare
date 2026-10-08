@@ -1,59 +1,74 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
-import HomeStackNavigator from './HomeStack';
-import ComingSoonScreen from '../screens/ComingSoonScreen';
+import { getFocusedRouteNameFromRoute, type NavigatorScreenParams } from '@react-navigation/native';
+import HomeStackNavigator, { type HomeStackParamList } from './HomeStack';
+import AssistantScreen from '../screens/AssistantScreen';
+import SmartwatchScreen from '../screens/SmartwatchScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/theme';
 
+const TAB_BAR_HEIGHT = 64;
+
 export type MainTabParamList = {
-  HomeTab: undefined;
-  Scan: undefined;
+  HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined; // lets the SOS shortcut open a Home screen directly
+  Watch: undefined;
   Assistant: undefined;
   Profile: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function ScanTabIcon({ focused }: { focused: boolean }) {
+// Raised centre button — opens your smartwatch data.
+function WatchTabIcon({ focused }: { focused: boolean }) {
   return (
-    <View style={[styles.scanButton, focused && styles.scanButtonActive]}>
-      <Ionicons name="camera-outline" size={26} color="#FFFFFF" />
+    <View style={[styles.centerButton, focused && styles.centerButtonActive]}>
+      <Ionicons name="watch-outline" size={26} color="#FFFFFF" />
     </View>
   );
 }
 
 export default function MainTabs() {
+  // Android draws its 3-button / gesture bar over the app, so lift the tab bar above it.
+  const { bottom } = useSafeAreaInsets();
+  const tabBarStyle = [styles.tabBar, { height: TAB_BAR_HEIGHT + bottom, paddingBottom: 8 + bottom }];
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.green,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle,
       }}
     >
       <Tab.Screen
         name="HomeTab"
         component={HomeStackNavigator}
-        options={{
+        options={({ route }) => ({
           title: 'Home',
           tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          // The SOS panel is full-screen: no tab bar to mis-tap in an emergency.
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'Sos' ? { display: 'none' } : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Watch"
+        component={SmartwatchScreen}
+        options={{
+          title: '',
+          tabBarIcon: ({ focused }) => <WatchTabIcon focused={focused} />,
+          tabBarAccessibilityLabel: 'Smartwatch data',
         }}
       />
       <Tab.Screen
-        name="Scan"
-        component={ComingSoonScreen}
-        initialParams={{ title: 'Wellness Scan', icon: 'camera-outline' }}
-        options={{ title: '', tabBarIcon: ({ focused }) => <ScanTabIcon focused={focused} /> }}
-      />
-      <Tab.Screen
         name="Assistant"
-        component={ComingSoonScreen}
-        initialParams={{ title: 'Health Assistant', icon: 'chatbubbles-outline' }}
+        component={AssistantScreen}
         options={{
           title: 'Assistant',
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
+          tabBarHideOnKeyboard: true, // keeps the message box right above the keyboard
         }}
       />
       <Tab.Screen
@@ -69,13 +84,13 @@ export default function MainTabs() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: { height: 64, paddingBottom: 8, paddingTop: 8, backgroundColor: colors.surface, borderTopColor: colors.border },
-  scanButton: {
+  tabBar: { paddingTop: 8, backgroundColor: colors.surface, borderTopColor: colors.border },
+  centerButton: {
     width: 52, height: 52, borderRadius: 26,
     backgroundColor: colors.green,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 20,
     shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  scanButtonActive: { backgroundColor: colors.blue },
+  centerButtonActive: { backgroundColor: colors.blue },
 });

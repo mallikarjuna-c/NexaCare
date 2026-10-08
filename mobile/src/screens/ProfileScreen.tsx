@@ -1,11 +1,18 @@
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { MainTabParamList } from '../navigation/MainTabs';
 import { useAuth } from '../context/AuthContext';
 import LeafAccent from '../components/LeafAccent';
 import { colors, typography, spacing } from '../theme/theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
+  // Screens like Share Health Data live in the Home tab's stack; initial:false keeps Home underneath for Back.
+  const openInHome = (screen: 'ShareHealthData' | 'Emergency') =>
+    navigation.navigate('HomeTab', { screen, initial: false });
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
     : '?';
@@ -44,6 +51,32 @@ export default function ProfileScreen() {
             <Ionicons name="shield-checkmark-outline" size={20} color={colors.textSecondary} />
             <Text style={styles.infoText}>NexaCare Member</Text>
           </View>
+        </View>
+
+        <View style={[styles.infoCard, styles.actionsCard]}>
+          <Pressable
+            style={({ pressed }) => [styles.actionRow, pressed && styles.logoutPressed]}
+            onPress={() => openInHome('ShareHealthData')}
+          >
+            <Ionicons name="share-outline" size={20} color={colors.green} />
+            <View style={styles.actionTextWrap}>
+              <Text style={styles.actionTitle}>Share health data</Text>
+              <Text style={styles.actionSub}>Send a PDF summary to your doctor</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </Pressable>
+          <View style={styles.divider} />
+          <Pressable
+            style={({ pressed }) => [styles.actionRow, pressed && styles.logoutPressed]}
+            onPress={() => openInHome('Emergency')}
+          >
+            <Ionicons name="medkit-outline" size={20} color={colors.danger} />
+            <View style={styles.actionTextWrap}>
+              <Text style={styles.actionTitle}>Medical ID & emergency contacts</Text>
+              <Text style={styles.actionSub}>Keep your SOS information up to date</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </Pressable>
         </View>
 
         <Pressable
@@ -87,6 +120,11 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   infoText: { fontSize: 14, color: colors.textPrimary },
   divider: { height: 1, backgroundColor: colors.border },
+  actionsCard: { marginTop: spacing.md, paddingVertical: spacing.xs },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  actionTextWrap: { flex: 1 },
+  actionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  actionSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
   logoutButton: {
     flexDirection: 'row',
