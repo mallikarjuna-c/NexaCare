@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import * as authService from '../services/authService';
+import { cancelAllRemindersForUser } from '../services/notificationService';
+import { restoreFollowUpReminders } from '../services/followUpService';
+import { removeFaceScanData } from '../services/legacyDataService';
 import type { User, AuthContextType } from '../types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,6 +18,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Logout clears this user's reminders from the device; put follow-up reminders back when they sign in.
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    restoreFollowUpReminders(userId).catch((e) => console.warn('Could not restore follow-up reminders', e));
+    removeFaceScanData(userId).catch(() => {}); // harmless if there's nothing to remove
+  }, [userId]);
+
   const login = async (email: string, password: string) => {
     const loggedInUser = await authService.login(email, password);
     setUser(loggedInUser);
@@ -26,6 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    if (user) {
+      // Scheduled notifications live on the device, not the account — clear this user's before signing out.
+      await cancelAllRemindersForUser(user.id).catch((e) => console.warn('Could not cancel reminders on logout', e));
+    }
     await authService.logout();
     setUser(null);
   };

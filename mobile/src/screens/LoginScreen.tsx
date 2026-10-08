@@ -119,7 +119,12 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg },
 
-  logo: { width: 110, height: 55, alignSelf: 'center', marginBottom: spacing.lg },
+  logo: { 
+    width: 130, 
+    height: 65, 
+    alignSelf: 'center', 
+    marginBottom: spacing.xl 
+  },
 
   headline: { textAlign: 'center' },
   subtitle: { textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.xl },

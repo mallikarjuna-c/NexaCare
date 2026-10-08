@@ -1,0 +1,9 @@
+services:
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false # without it the server still starts; /health reports the missing key
+    ports:
+      - "127.0.0.1:8010:8000" # this PC only (port 8010); the phone reaches it through `adb reverse`
+    restart: unless-stopped
