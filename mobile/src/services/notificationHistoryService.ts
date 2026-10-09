@@ -19,14 +19,13 @@ function welcomeNotification(): AppNotification {
   };
 }
 
-// Returns null when stored data is unreadable, so the caller can recover instead of crashing.
 function parseStored(raw: string): AppNotification[] | null {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
     return parsed
       .filter((n): n is AppNotification => !!n && typeof n.id === 'string' && typeof n.title === 'string')
-      .map((n) => ({ ...n, category: n.category ?? 'announcement' })); // older entries had no category
+      .map((n) => ({ ...n, category: n.category ?? 'announcement' }));
   } catch {
     return null;
   }
@@ -39,7 +38,6 @@ async function save(userId: string, list: AppNotification[]): Promise<void> {
 export async function getNotifications(userId: string): Promise<AppNotification[]> {
   const raw = await AsyncStorage.getItem(keyFor(userId));
 
-  // First run: a real welcome message, so the inbox isn't empty.
   if (raw === null) {
     const seeded = [welcomeNotification()];
     await save(userId, seeded);

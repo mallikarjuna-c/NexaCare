@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatWhen, type FollowUp, type FollowUpType } from '../types/followUps';
 import { colors, spacing } from '../theme/theme';
 
-const DANGER_TINT = '#FCE1E1'; // same danger tint used on Home and Health Records
+const DANGER_TINT = '#FCE1E1';
 
 export const FOLLOW_UP_BADGES: Record<FollowUpType, { icon: keyof typeof Ionicons.glyphMap; bg: string; tint: string }> = {
   appointment: { icon: 'medical-outline', bg: colors.badge.blueBg, tint: colors.badge.blueIcon },
@@ -18,7 +18,7 @@ type Props = {
   hasReminder: boolean;
   isBusy: boolean;
   onPress: () => void;
-  onComplete?: () => void; // only for scheduled items
+  onComplete?: () => void;
 };
 
 export default function FollowUpCard({ followUp, overdue, hasReminder, isBusy, onPress, onComplete }: Props) {

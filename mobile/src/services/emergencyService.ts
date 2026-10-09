@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { EmergencyContact, EmergencyContactInput, MedicalInfo } from '../types/emergency';
 
+import { loadCachedData, loadData, removeLocalData, saveData } from './profileStore';
+
 const CONTACTS_PREFIX = 'nexacare_emergency_contacts_';
-const MEDICAL_PREFIX = 'nexacare_medical_info_';
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   const raw = await AsyncStorage.getItem(key);
@@ -15,8 +16,6 @@ async function readJson<T>(key: string, fallback: T): Promise<T> {
   }
 }
 
-// ---- Emergency contacts ----
-
 async function readContacts(userId: string): Promise<EmergencyContact[]> {
   const list = await readJson<unknown>(`${CONTACTS_PREFIX}${userId}`, []);
   return Array.isArray(list) ? (list as EmergencyContact[]) : [];
@@ -26,7 +25,6 @@ async function writeContacts(userId: string, list: EmergencyContact[]): Promise<
   await AsyncStorage.setItem(`${CONTACTS_PREFIX}${userId}`, JSON.stringify(list));
 }
 
-// Kept in the order they were added — the first contact is the "primary" one.
 export async function getEmergencyContacts(userId: string): Promise<EmergencyContact[]> {
   return readContacts(userId);
 }
@@ -58,7 +56,6 @@ export async function updateEmergencyContact(userId: string, id: string, input: 
   return contact;
 }
 
-// The first contact is the primary one the SOS panel alerts first.
 export async function makePrimaryContact(userId: string, id: string): Promise<void> {
   const list = await readContacts(userId);
   const contact = list.find((c) => c.id === id);
@@ -71,15 +68,24 @@ export async function deleteEmergencyContact(userId: string, id: string): Promis
   await writeContacts(userId, list.filter((c) => c.id !== id));
 }
 
-// ---- Medical ID ----
+function asMedicalInfo(info: unknown): MedicalInfo {
+  return info && typeof info === 'object' && !Array.isArray(info) ? (info as MedicalInfo) : {};
+}
 
 export async function getMedicalInfo(userId: string): Promise<MedicalInfo> {
-  const info = await readJson<unknown>(`${MEDICAL_PREFIX}${userId}`, {});
-  return info && typeof info === 'object' && !Array.isArray(info) ? (info as MedicalInfo) : {};
+  return asMedicalInfo(await loadData<unknown>('medical', userId, {}));
+}
+
+export async function getMedicalInfoOffline(userId: string): Promise<MedicalInfo> {
+  return asMedicalInfo(await loadCachedData<unknown>('medical', userId, {}));
+}
+
+export async function removeMedicalInfo(userId: string): Promise<void> {
+  await removeLocalData('medical', userId);
 }
 
 export async function saveMedicalInfo(userId: string, info: MedicalInfo): Promise<MedicalInfo> {
   const saved: MedicalInfo = { ...info, updatedAt: new Date().toISOString() };
-  await AsyncStorage.setItem(`${MEDICAL_PREFIX}${userId}`, JSON.stringify(saved));
+  await saveData('medical', userId, saved);
   return saved;
 }

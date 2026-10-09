@@ -22,33 +22,35 @@ import MedicalInfoScreen from '../screens/MedicalInfoScreen';
 import SosScreen from '../screens/SosScreen';
 import ShareHealthDataScreen from '../screens/ShareHealthDataScreen';
 import TrendsScreen from '../screens/TrendsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import type { TrendMetric } from '../types/trends';
 import type { Ionicons } from '@expo/vector-icons';
-import type { HealthRecord, HealthRecordType } from '../types/healthRecords';
+import type { HealthRecordType } from '../types/healthRecords';
 
 export type HomeStackParamList = {
   HomeMain: undefined;
   ComingSoon: { title: string; icon: keyof typeof Ionicons.glyphMap };
   HealthRecords: undefined;
-  AddRecord: { initialType?: HealthRecordType } | undefined;
-  RecordDetail: { record: HealthRecord };
+  AddRecord: { initialType?: HealthRecordType; recordId?: string } | undefined;
+  RecordDetail: { recordId: string };
   Challenges: undefined;
   ChallengeDetail: { challengeId: string };
   Notifications: undefined;
   FollowUps: undefined;
-  AddFollowUp: { followUpId?: string; providerId?: string } | undefined; // followUpId = edit; providerId = prefill
+  AddFollowUp: { followUpId?: string; providerId?: string } | undefined;
   FollowUpDetail: { followUpId: string };
   Expenses: undefined;
-  AddExpense: { expenseId?: string; providerId?: string } | undefined; // expenseId = edit; providerId = prefill
+  AddExpense: { expenseId?: string; providerId?: string } | undefined;
   ExpenseDetail: { expenseId: string };
   Directory: undefined;
-  AddProvider: { providerId?: string } | undefined; // providerId present = edit mode
+  AddProvider: { providerId?: string } | undefined;
   ProviderDetail: { providerId: string };
   Emergency: undefined;
-  AddEmergencyContact: { contactId?: string } | undefined; // contactId present = edit mode
-  MedicalInfo: undefined;
+  AddEmergencyContact: { contactId?: string } | undefined;
+  MedicalInfo: { profileId?: string } | undefined;
+  Profile: undefined;
   Sos: undefined;
-  ShareHealthData: { recordIds?: string[] } | undefined; // recordIds = preselected (from "Share this record")
+  ShareHealthData: { recordIds?: string[] } | undefined;
   Trends: { metric?: TrendMetric } | undefined;
 };
 
@@ -79,6 +81,7 @@ export default function HomeStackNavigator() {
       <Stack.Screen name="MedicalInfo" component={MedicalInfoScreen} options={{ title: 'Medical ID' }} />
       <Stack.Screen name="ShareHealthData" component={ShareHealthDataScreen} options={{ title: 'Share Health Data' }} />
       <Stack.Screen name="Trends" component={TrendsScreen} options={{ title: 'Health Trends' }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
       <Stack.Screen
         name="Sos"
         component={SosScreen}

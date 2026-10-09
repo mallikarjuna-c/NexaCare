@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
 import { PROVIDER_BADGES, openExternal } from '../components/ProviderRow';
 import { FOLLOW_UP_BADGES } from '../components/FollowUpCard';
 import { deleteProvider, getProviderById, setProviderFavorite } from '../services/directoryService';
@@ -20,6 +21,8 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'ProviderDetail'>;
 export default function ProviderDetailScreen({ navigation, route }: Props) {
   const { providerId } = route.params;
   const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
   const [provider, setProvider] = useState<Provider | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -27,12 +30,12 @@ export default function ProviderDetailScreen({ navigation, route }: Props) {
   const [isBusy, setIsBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user || !profileId) return;
     try {
       const [p, allFollowUps, allExpenses] = await Promise.all([
         getProviderById(user.id, providerId),
-        getFollowUps(user.id),
-        getExpenses(user.id),
+        getFollowUps(profileId),
+        getExpenses(profileId),
       ]);
       setProvider(p);
       setFollowUps(allFollowUps.filter((f) => f.providerId === providerId));
@@ -42,9 +45,8 @@ export default function ProviderDetailScreen({ navigation, route }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, providerId]);
+  }, [user, profileId, providerId]);
 
-  // Refresh after returning from the edit screen.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const toggleFavorite = async () => {
@@ -103,7 +105,6 @@ export default function ProviderDetailScreen({ navigation, route }: Props) {
   const badge = PROVIDER_BADGES[provider.type];
   const mapsUrl = providerMapsUrl(provider);
 
-  // Activity with this provider (only items linked via the provider picker).
   const now = Date.now();
   const nextFollowUp = followUps.find((f) => f.status === 'scheduled' && !isOverdue(f, now));
   const overdueCount = followUps.filter((f) => isOverdue(f, now)).length;

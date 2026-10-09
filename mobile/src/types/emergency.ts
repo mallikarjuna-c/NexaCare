@@ -24,7 +24,6 @@ export const RELATION_LABELS: Record<Relation, string> = {
 
 export const RELATIONS = Object.keys(RELATION_LABELS) as Relation[];
 
-// Medical ID — shown on the Emergency screen for anyone helping you.
 export type MedicalInfo = {
   bloodGroup?: BloodGroup;
   allergies?: string;
@@ -41,10 +40,9 @@ export function hasMedicalInfo(info: MedicalInfo): boolean {
   return !!(info.bloodGroup || info.allergies || info.conditions || info.medications || info.notes);
 }
 
-// Public helplines in India. These are dialled by the user from their own dialer — the app never auto-calls.
 export type Helpline = { number: string; label: string; icon: keyof typeof Ionicons.glyphMap };
 
-export const PRIMARY_EMERGENCY_NUMBER = '112'; // National Emergency Response Support System (ERSS)
+export const PRIMARY_EMERGENCY_NUMBER = '112';
 
 export const HELPLINES: Helpline[] = [
   { number: '108', label: 'Ambulance', icon: 'medkit-outline' },
@@ -54,8 +52,6 @@ export const HELPLINES: Helpline[] = [
   { number: '1098', label: 'Child helpline', icon: 'happy-outline' },
   { number: '14416', label: 'Mental health (Tele-MANAS)', icon: 'chatbubble-ellipses-outline' },
 ];
-
-// ---- Help message ----
 
 export type Coordinates = { latitude: number; longitude: number; accuracy?: number | null };
 
@@ -81,8 +77,6 @@ export function buildHelpMessage(senderName: string, coords: Coordinates | null,
   return lines.join('\n');
 }
 
-// WhatsApp needs the full international number without "+" (e.g. 919876543210).
-// Numbers saved without a country code are assumed to be Indian.
 export function whatsappNumber(phone: string): string {
   let digits = phone.replace(/[^\d]/g, '');
   if (phone.trim().startsWith('+')) return digits;
@@ -91,7 +85,6 @@ export function whatsappNumber(phone: string): string {
   return digits.length === 10 ? `91${digits}` : digits;
 }
 
-// Try the WhatsApp app first; the https link is the fallback (opens WhatsApp or its web page).
 export function whatsappUrls(phone: string, body: string): string[] {
   const number = whatsappNumber(phone);
   const text = encodeURIComponent(body);

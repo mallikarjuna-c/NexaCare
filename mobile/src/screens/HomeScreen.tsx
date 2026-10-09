@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { getUnreadCount } from '../services/notificationHistoryService';
-import { getWatchSummary, isWatchConnected } from '../services/healthConnectService';
+import { getWatchSummary, isWatchConnected, uploadWatchSummary } from '../services/healthConnectService';
 import {
   WATCH_METRICS, formatWatchValue, timeAgo, watchMetricStatus, type Tone, type WatchSummary,
 } from '../types/smartwatch';
@@ -18,7 +18,9 @@ const TONE_STYLES: Record<Tone, { bg: string; fg: string }> = {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
 import LeafAccent from '../components/LeafAccent';
+import { initialsOf, possessive } from '../types/family';
 import { colors, typography, spacing } from '../theme/theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
@@ -26,13 +28,13 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 export default function HomeScreen({ navigation }: Props) {
   const { user } = useAuth();
   const firstName = user?.name?.split(' ')[0] ?? 'there';
-  const initials = user?.name ? user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() : '?';
   const [unreadCount, setUnreadCount] = useState(0);
   const [watch, setWatch] = useState<WatchSummary | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const { activeProfile } = useFamily();
   const openWatch = () => navigation.getParent()?.navigate('Watch' as never);
+  const openFamily = () => navigation.getParent()?.navigate('Family' as never);
 
-  // Latest reading for each watch metric that has data (up to 6), for "Your health metrics".
   const latestMetrics = watch
     ? WATCH_METRICS.filter((m) => m.key !== 'steps' && m.key !== 'sleep')
         .concat(WATCH_METRICS.filter((m) => m.key === 'steps' || m.key === 'sleep'))
@@ -49,15 +51,17 @@ export default function HomeScreen({ navigation }: Props) {
       if (!user) return;
       setRefreshKey((k) => k + 1);
       getUnreadCount(user.id).then(setUnreadCount).catch(() => setUnreadCount(0));
-      // Wellness Summary: latest watch readings, if a watch is connected.
       isWatchConnected(user.id)
         .then((connected) => (connected ? getWatchSummary() : null))
-        .then(setWatch)
+        .then((summary) => {
+          setWatch(summary);
+          if (summary) uploadWatchSummary(user.id, summary).catch(() => {});
+        })
         .catch(() => setWatch(null));
     }, [user])
   );
 
-  const goToProfile = () => navigation.getParent()?.navigate('Profile' as never);
+  const viewingMember = !!activeProfile && !activeProfile.isSelf;
 
   return (
     <View style={styles.screen}>
@@ -67,9 +71,18 @@ export default function HomeScreen({ navigation }: Props) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <View>
+          <View style={styles.greetingWrap}>
             <Text style={styles.greetingLabel}>Hello, {firstName} 👋</Text>
-            <Text style={styles.greetingSubtitle}>How can we help you today?</Text>
+            {viewingMember ? (
+              <Pressable onPress={openFamily} hitSlop={6} style={styles.viewingRow}>
+                <Text style={styles.viewingText} numberOfLines={1}>
+                  Viewing {activeProfile.name} · {activeProfile.relationLabel}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.green} />
+              </Pressable>
+            ) : (
+              <Text style={styles.greetingSubtitle}>How can we help you today?</Text>
+            )}
           </View>
           <View style={styles.headerActions}>
             <Pressable
@@ -92,13 +105,18 @@ export default function HomeScreen({ navigation }: Props) {
                 </View>
               )}
             </Pressable>
-            <Pressable style={styles.avatarButton} onPress={goToProfile}>
-              <Text style={styles.avatarText}>{initials}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.avatarButton, pressed && styles.cardPressed]}
+              onPress={() => navigation.navigate('Profile')}
+              accessibilityRole="button"
+              accessibilityLabel="Your profile"
+            >
+              <Text style={styles.avatarText}>{initialsOf(user?.name ?? '')}</Text>
             </Pressable>
           </View>
         </View>
 
-                <View style={styles.promoRow}>
+        <View style={styles.promoRow}>
           <Pressable
             style={({ pressed }) => [styles.promoCard, pressed && styles.cardPressed]}
             onPress={() => navigation.navigate('HealthRecords')}
@@ -107,7 +125,9 @@ export default function HomeScreen({ navigation }: Props) {
               <Ionicons name="document-text-outline" size={22} color={colors.badge.greenIcon} />
             </View>
             <Text style={styles.promoTitle}>Health Records</Text>
-            <Text style={styles.promoSubtitle}>Track your vitals & documents</Text>
+            <Text style={styles.promoSubtitle}>
+              {activeProfile && !activeProfile.isSelf ? `${possessive(activeProfile)} vitals & documents` : 'Track your vitals & documents'}
+            </Text>
             <Text style={styles.promoLink}>View Records →</Text>
           </Pressable>
 
@@ -194,7 +214,6 @@ export default function HomeScreen({ navigation }: Props) {
           <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         </Pressable>
 
-        {/* Wellness Summary — day-by-day chart for one metric since the 1st, with lowest / highest */}
         {user && (
           <MonthAnalysis
             userId={user.id}
@@ -204,7 +223,6 @@ export default function HomeScreen({ navigation }: Props) {
           />
         )}
 
-        {/* Your health metrics — latest watch readings */}
         <View style={styles.summaryHeaderRow}>
           <Text style={styles.metricsTitle}>Your health metrics</Text>
           {watch && (
@@ -281,6 +299,9 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: colors.surface,
   },
   bellBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  greetingWrap: { flex: 1, marginRight: spacing.sm },
+  viewingRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
+  viewingText: { flexShrink: 1, fontSize: 13, fontWeight: '700', color: colors.green },
   avatarButton: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center',

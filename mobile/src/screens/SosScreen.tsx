@@ -7,7 +7,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
 import { openExternal } from '../components/ProviderRow';
-import { getEmergencyContacts, getMedicalInfo } from '../services/emergencyService';
+import { getEmergencyContacts, getMedicalInfoOffline } from '../services/emergencyService';
 import { getCurrentLocation, type LocationResult } from '../services/locationService';
 import { dialUrl } from '../types/directory';
 import {
@@ -30,7 +30,7 @@ type LocationState =
   | { status: 'unavailable'; reason: string };
 
 const DANGER_TINT = '#FCE1E1';
-const WAIT_FOR_LOCATION_MS = 4000; // how long a tap waits for a pending location before sending without it
+const WAIT_FOR_LOCATION_MS = 4000;
 
 const UNAVAILABLE_TEXT: Record<string, string> = {
   permission_denied: 'Location permission is off',
@@ -50,23 +50,21 @@ export default function SosScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const [c, info] = await Promise.all([getEmergencyContacts(user.id), getMedicalInfo(user.id)]);
+      const [c, info] = await Promise.all([getEmergencyContacts(user.id), getMedicalInfoOffline(user.id)]);
       setContacts(c);
       setMedical(info);
     } catch {
-      // Call 112 still works without saved data.
     }
   }, [user]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // Start locating the moment the panel opens, so it's usually ready by the time a button is tapped.
   const locate = useCallback(() => {
     setLocation({ status: 'loading' });
     const request = getCurrentLocation().catch((): LocationResult => ({ ok: false, reason: 'unavailable' }));
     locationRequest.current = request;
     request.then((result) => {
-      if (locationRequest.current !== request) return; // a newer retry replaced this one
+      if (locationRequest.current !== request) return;
       setLocation(
         result.ok
           ? { status: 'ready', coords: result.coords, isApproximate: result.isApproximate }
@@ -77,7 +75,6 @@ export default function SosScreen({ navigation }: Props) {
 
   useEffect(() => { locate(); }, [locate]);
 
-  // Uses the location if it's ready; otherwise waits briefly, then sends without it rather than blocking.
   const resolveCoords = async (): Promise<Coordinates | null> => {
     const request = locationRequest.current;
     if (!request) return null;
@@ -114,7 +111,6 @@ export default function SosScreen({ navigation }: Props) {
           await Linking.openURL(url);
           return;
         } catch {
-          // try the next link
         }
       }
       Alert.alert('WhatsApp unavailable', `Send ${contact.name} an SMS instead? SMS works without mobile data.`, [
@@ -149,7 +145,6 @@ export default function SosScreen({ navigation }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
-        {/* Location status */}
         <Pressable
           style={[
             styles.locationPill,
@@ -181,7 +176,6 @@ export default function SosScreen({ navigation }: Props) {
           )}
         </Pressable>
 
-        {/* 1. Alert primary trusted contact */}
         {primary ? (
           <Pressable
             style={({ pressed }) => [styles.alertButton, pressed && styles.bigPressed]}
@@ -213,7 +207,6 @@ export default function SosScreen({ navigation }: Props) {
           </Pressable>
         )}
 
-        {/* 2. Call 112 */}
         <Pressable
           style={({ pressed }) => [styles.callButton, pressed && styles.bigPressed]}
           onPress={() => call(PRIMARY_EMERGENCY_NUMBER)}
@@ -234,7 +227,6 @@ export default function SosScreen({ navigation }: Props) {
           </Pressable>
         )}
 
-        {/* Other trusted contacts */}
         {others.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>Other trusted contacts</Text>

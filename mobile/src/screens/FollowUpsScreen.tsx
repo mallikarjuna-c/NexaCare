@@ -4,7 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
-import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
+import ProfileBanner from '../components/ProfileBanner';
+import { possessive } from '../types/family';
 import FollowUpCard from '../components/FollowUpCard';
 import { getActiveReminderIds, getFollowUps, setFollowUpStatus } from '../services/followUpService';
 import { isOverdue, type FollowUp } from '../types/followUps';
@@ -16,7 +18,9 @@ type Tab = 'upcoming' | 'history';
 const DANGER_TINT = '#FCE1E1';
 
 export default function FollowUpsScreen({ navigation }: Props) {
-  const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
+  const canEdit = activeProfile?.canEdit ?? true;
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [activeReminders, setActiveReminders] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -25,10 +29,10 @@ export default function FollowUpsScreen({ navigation }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!profileId) return;
     setLoadError(false);
     try {
-      const [list, reminders] = await Promise.all([getFollowUps(user.id), getActiveReminderIds(user.id)]);
+      const [list, reminders] = await Promise.all([getFollowUps(profileId), getActiveReminderIds(profileId)]);
       setFollowUps(list);
       setActiveReminders(reminders);
     } catch {
@@ -36,15 +40,15 @@ export default function FollowUpsScreen({ navigation }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [profileId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const handleComplete = async (followUp: FollowUp) => {
-    if (!user || busyId) return;
+    if (!profileId || busyId) return;
     setBusyId(followUp.id);
     try {
-      await setFollowUpStatus(user.id, followUp.id, 'completed');
+      await setFollowUpStatus(profileId, followUp.id, 'completed');
       await load();
     } catch {
       Alert.alert('Something went wrong', "We couldn't update this follow-up. Please try again.");
@@ -98,24 +102,27 @@ export default function FollowUpsScreen({ navigation }: Props) {
       hasReminder={activeReminders.has(f.id)}
       isBusy={busyId === f.id}
       onPress={() => openDetail(f)}
-      onComplete={f.status === 'scheduled' ? () => handleComplete(f) : undefined}
+      onComplete={canEdit && f.status === 'scheduled' ? () => handleComplete(f) : undefined}
     />
   );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ProfileBanner what="follow-ups" style={styles.banner} />
       <View style={styles.headerRow}>
         <View style={styles.flexText}>
-          <Text style={styles.headerTitle}>Your follow-ups</Text>
+          <Text style={styles.headerTitle}>{activeProfile ? possessive(activeProfile) : 'Your'} follow-ups</Text>
           <Text style={styles.headerSubtitle}>Appointments, tests & medication reviews</Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-          onPress={() => navigation.navigate('AddFollowUp')}
-        >
-          <Ionicons name="add" size={18} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Add</Text>
-        </Pressable>
+        {canEdit && (
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('AddFollowUp')}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Add</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.statsRow}>
@@ -153,13 +160,15 @@ export default function FollowUpsScreen({ navigation }: Props) {
             <Text style={styles.stateBody}>
               Add doctor appointments, prescribed tests or medication reviews and we'll remind you before they're due.
             </Text>
-            <Pressable
-              style={({ pressed }) => [styles.pillButton, styles.retryButton, pressed && styles.pressed]}
-              onPress={() => navigation.navigate('AddFollowUp')}
-            >
-              <Text style={styles.pillButtonText}>Add follow-up</Text>
-              <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-            </Pressable>
+            {canEdit && (
+              <Pressable
+                style={({ pressed }) => [styles.pillButton, styles.retryButton, pressed && styles.pressed]}
+                onPress={() => navigation.navigate('AddFollowUp')}
+              >
+                <Text style={styles.pillButtonText}>Add follow-up</Text>
+                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+              </Pressable>
+            )}
           </View>
         ) : (
           <>
@@ -196,6 +205,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  banner: { marginBottom: spacing.md },
   flexText: { flex: 1 },
   pressed: { opacity: 0.7 },
 

@@ -48,7 +48,6 @@ export default function TrendsScreen({ navigation, route }: Props) {
     }
   }, [user, metric, period]);
 
-  // Reload when the metric/period changes, and when coming back (e.g. after adding a record).
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const points = trend?.points ?? [];
@@ -75,7 +74,6 @@ export default function TrendsScreen({ navigation, route }: Props) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Metric chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {TREND_METRICS.map((m) => {
           const active = m.key === metric;
@@ -94,7 +92,6 @@ export default function TrendsScreen({ navigation, route }: Props) {
         })}
       </ScrollView>
 
-      {/* Period */}
       <View style={styles.segment}>
         {TREND_PERIODS.map((p) => (
           <Pressable key={p} style={[styles.segmentItem, period === p && styles.segmentItemActive]} onPress={() => setPeriod(p)}>
@@ -173,7 +170,6 @@ export default function TrendsScreen({ navigation, route }: Props) {
         )}
       </View>
 
-      {/* Summary tiles */}
       {!isLoading && points.length > 0 && (
         <View style={styles.statsRow}>
           {[

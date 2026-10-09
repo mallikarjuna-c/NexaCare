@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 
 export default function SignupScreen({ navigation }: Props) {
   const { signup } = useAuth();
-  const insets = useSafeAreaInsets(); // keeps the bottom link clear of Android's navigation buttons
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,8 +32,8 @@ export default function SignupScreen({ navigation }: Props) {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Weak password', 'Password must be at least 6 characters.');
+    if (password.length < 8) {
+      Alert.alert('Weak password', 'Password must be at least 8 characters.');
       return;
     }
 
@@ -112,7 +112,7 @@ export default function SignupScreen({ navigation }: Props) {
                 <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Password (min 6 characters)"
+                  placeholder="Password (min 8 characters)"
                   placeholderTextColor={colors.textSecondary}
                   secureTextEntry={!showPassword}
                   value={password}

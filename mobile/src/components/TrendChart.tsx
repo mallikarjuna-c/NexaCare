@@ -4,12 +4,9 @@ import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
 import type { TrendPoint } from '../types/trends';
 import { colors } from '../theme/theme';
 
-// Single-metric daily chart: line (with optional second line, e.g. diastolic BP) or bars.
-// One slot per calendar day; tap anywhere to select the nearest day with data.
-
 type Props = {
-  points: TrendPoint[]; // oldest first, days with data only
-  days: number; // number of calendar days shown, ending today
+  points: TrendPoint[];
+  days: number;
   kind: 'line' | 'bar';
   band?: { lo: number; hi: number };
   selectedDay: string | null;
@@ -25,7 +22,6 @@ function isoDay(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Round axis bounds to tidy numbers.
 function niceBounds(min: number, max: number): [number, number] {
   if (min === max) return [min * 0.9, max * 1.1 || 1];
   const range = max - min;
@@ -62,7 +58,6 @@ export default function TrendChart({ points, days, kind, band, selectedDay, onSe
       .join(' ');
 
   const ticks = [yMin, (yMin + yMax) / 2, yMax];
-  // Label the first, middle and last day (7 days: every other day).
   const labelEvery = days <= 7 ? 1 : Math.ceil(days / 5);
 
   const handlePress = (locationX: number) => {
@@ -79,7 +74,6 @@ export default function TrendChart({ points, days, kind, band, selectedDay, onSe
       {width > 0 && (
         <Pressable onPress={(e) => handlePress(e.nativeEvent.locationX)} accessibilityRole="adjustable" accessibilityLabel="Trend chart — tap to see a day">
           <Svg width={width} height={HEIGHT}>
-            {/* Healthy band */}
             {band && (
               <Rect
                 x={PAD.left}
@@ -90,7 +84,6 @@ export default function TrendChart({ points, days, kind, band, selectedDay, onSe
                 opacity={0.6}
               />
             )}
-            {/* Recessive grid */}
             {ticks.map((t) => (
               <Line key={t} x1={PAD.left} x2={PAD.left + plotW} y1={y(t)} y2={y(t)} stroke={colors.border} strokeWidth={1} />
             ))}
@@ -139,7 +132,6 @@ export default function TrendChart({ points, days, kind, band, selectedDay, onSe
               )}
           </Svg>
 
-          {/* Axis labels (plain Text keeps them crisp and theme-coloured) */}
           {ticks.map((t) => (
             <Text key={`t${t}`} style={[styles.yLabel, { top: y(t) - 7 }]}>{formatAxis(t)}</Text>
           ))}

@@ -23,7 +23,6 @@ async function writeAll(userId: string, list: Provider[]): Promise<void> {
   await AsyncStorage.setItem(keyFor(userId), JSON.stringify(list));
 }
 
-// Favourites first, then alphabetical.
 export async function getProviders(userId: string): Promise<Provider[]> {
   const list = await readAll(userId);
   return list.sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite) || a.name.localeCompare(b.name));

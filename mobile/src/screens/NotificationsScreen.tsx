@@ -23,7 +23,7 @@ import { colors, spacing } from '../theme/theme';
 type IconName = keyof typeof Ionicons.glyphMap;
 type BadgeStyle = { icon: IconName; bg: string; tint: string };
 
-const DANGER_TINT = '#FCE1E1'; // same danger tint used on Home and Health Records
+const DANGER_TINT = '#FCE1E1';
 
 const REMINDER_BADGES: Record<ReminderKey, BadgeStyle> = {
   health_checkin: { icon: 'heart-outline', bg: colors.badge.greenBg, tint: colors.badge.greenIcon },
@@ -138,7 +138,6 @@ export default function NotificationsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<ReminderKey | null>(null);
 
-  // Toggles always reflect what is actually scheduled on the device.
   const syncDeviceState = useCallback(async () => {
     if (!user) return;
     const [perm, status] = await Promise.all([getPermissionState(), getReminderStatus(user.id)]);
@@ -162,8 +161,6 @@ export default function NotificationsScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-      // Coming back from system settings doesn't change screen focus,
-      // so re-check permission whenever the app becomes active again.
       const subscription = AppState.addEventListener('change', (state) => {
         if (state === 'active') syncDeviceState().catch(() => {});
       });
@@ -220,7 +217,7 @@ export default function NotificationsScreen() {
     try {
       await markAsRead(user.id, n.id);
     } catch {
-      load(); // fall back to what's stored
+      load();
     }
   };
 
@@ -383,7 +380,6 @@ const styles = StyleSheet.create({
   flexText: { flex: 1 },
   pressed: { opacity: 0.7 },
 
-  // Permission banner
   banner: {
     backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border,
     padding: spacing.md, gap: spacing.md, marginBottom: spacing.lg,
@@ -398,7 +394,6 @@ const styles = StyleSheet.create({
   pillButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   retryButton: { alignSelf: 'center', marginTop: spacing.lg },
 
-  // Sections
   sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   sectionHint: { fontSize: 12, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.sm },
   sectionSpacing: { marginTop: spacing.xl },
@@ -408,7 +403,6 @@ const styles = StyleSheet.create({
   countPillText: { fontSize: 11, fontWeight: '700', color: colors.green },
   linkText: { fontSize: 13, fontWeight: '700', color: colors.green },
 
-  // Reminders
   card: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border },
   reminderRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, gap: spacing.md },
   divider: { height: 1, backgroundColor: colors.border, marginLeft: spacing.md + 40 + spacing.md },
@@ -428,7 +422,6 @@ const styles = StyleSheet.create({
   timeChipTextOn: { color: colors.green },
   switchSlot: { minWidth: 52, alignItems: 'flex-end', justifyContent: 'center' },
 
-  // Inbox
   list: { gap: spacing.sm },
   notifCard: {
     flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start',
@@ -442,7 +435,6 @@ const styles = StyleSheet.create({
   notifBody: { fontSize: 13, color: colors.textSecondary, marginTop: 2, lineHeight: 18 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green, marginTop: 6 },
 
-  // Empty / error states
   emptyCard: {
     alignItems: 'center', padding: spacing.xl, backgroundColor: colors.surface,
     borderRadius: 16, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',

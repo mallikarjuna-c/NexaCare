@@ -1,27 +1,35 @@
-import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import {
+  View, Text, TextInput, Pressable, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Image, ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
-import { useAuth } from '../context/AuthContext';
-import { addRecord } from '../services/healthRecordsService';
-import { RECORD_TYPE_LABELS, DOCUMENT_TYPES, type HealthRecordType, type AttachmentType } from '../types/healthRecords';
-import { toLocalISODate } from '../types/expenses';
+import { useFamily } from '../context/FamilyContext';
+import ProfileBanner from '../components/ProfileBanner';
+import { addRecord, getRecordById, updateRecord } from '../services/healthRecordsService';
+import {
+  RECORD_TYPE_LABELS, DOCUMENT_TYPES, formatRecordDate, type HealthRecordType, type AttachmentType,
+} from '../types/healthRecords';
+import { parseLocalISODate, toLocalISODate } from '../types/expenses';
 import { colors, typography, spacing } from '../theme/theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'AddRecord'>;
 
 const TYPE_OPTIONS = Object.keys(RECORD_TYPE_LABELS) as HealthRecordType[];
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Local date — toISOString() is UTC, which is still "yesterday" before 5:30 AM in India.
 function todayISO() {
   return toLocalISODate(new Date());
 }
 
 export default function AddRecordScreen({ navigation, route }: Props) {
-  const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const editingId = route.params?.recordId;
+  const [isLoadingExisting, setIsLoadingExisting] = useState(!!editingId);
   const [type, setType] = useState<HealthRecordType>(route.params?.initialType ?? 'blood_pressure');
   const [value, setValue] = useState('');
   const [date, setDate] = useState(todayISO());
@@ -33,6 +41,43 @@ export default function AddRecordScreen({ navigation, route }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isDocumentType = DOCUMENT_TYPES.includes(type);
+  const hasValidDate = ISO_DATE.test(date);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: editingId ? 'Edit Record' : 'Add Record' });
+  }, [navigation, editingId]);
+
+  useEffect(() => {
+    if (!activeProfile || !editingId) return;
+    getRecordById(activeProfile.id, editingId)
+      .then((existing) => {
+        if (!existing) {
+          Alert.alert('Not found', 'This record no longer exists.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+          return;
+        }
+        setType(existing.type);
+        setValue(existing.value);
+        setDate(existing.date);
+        setNotes(existing.notes ?? '');
+        setProviderName(existing.providerName ?? '');
+        setAttachmentUri(existing.attachmentUri);
+        setAttachmentName(existing.attachmentName);
+        setAttachmentType(existing.attachmentType);
+      })
+      .catch(() => Alert.alert('Something went wrong', "We couldn't load this record."))
+      .finally(() => setIsLoadingExisting(false));
+  }, [activeProfile, editingId, navigation]);
+
+  const pickerDate = hasValidDate ? parseLocalISODate(date) : new Date();
+
+  const openDatePicker = () => {
+    DateTimePickerAndroid.open({
+      value: pickerDate,
+      mode: 'date',
+      maximumDate: new Date(),
+      onValueChange: (_event, selected) => setDate(toLocalISODate(selected)),
+    });
+  };
 
   const pickDocument = async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -73,24 +118,27 @@ export default function AddRecordScreen({ navigation, route }: Props) {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!activeProfile) return;
     if (!value.trim() || !date.trim()) {
       Alert.alert('Missing info', isDocumentType ? 'Please enter a title and date.' : 'Please enter both a value and a date.');
       return;
     }
 
+    const input = {
+      type,
+      value: value.trim(),
+      date: date.trim(),
+      notes: notes.trim() || undefined,
+      providerName: isDocumentType && providerName.trim() ? providerName.trim() : undefined,
+      attachmentUri: isDocumentType ? attachmentUri : undefined,
+      attachmentName: isDocumentType ? attachmentName : undefined,
+      attachmentType: isDocumentType ? attachmentType : undefined,
+    };
+
     setIsSubmitting(true);
     try {
-      await addRecord(user.id, {
-        type,
-        value: value.trim(),
-        date: date.trim(),
-        notes: notes.trim() || undefined,
-        providerName: isDocumentType && providerName.trim() ? providerName.trim() : undefined,
-        attachmentUri,
-        attachmentName,
-        attachmentType,
-      });
+      if (editingId) await updateRecord(activeProfile.id, editingId, input);
+      else await addRecord(activeProfile.id, input);
       navigation.goBack();
     } catch {
       Alert.alert('Something went wrong', 'Could not save this record. Please try again.');
@@ -99,10 +147,19 @@ export default function AddRecordScreen({ navigation, route }: Props) {
     }
   };
 
+  if (isLoadingExisting) {
+    return (
+      <View style={[styles.screen, styles.centered]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <Text style={typography.heading}>Add Health Record</Text>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ProfileBanner what="records" switchable={false} style={styles.banner} />
+        <Text style={typography.heading}>{editingId ? 'Edit Health Record' : 'Add Health Record'}</Text>
         <Text style={[typography.body, styles.subtitle]}>Record type</Text>
 
         <View style={styles.typeGrid}>
@@ -142,13 +199,25 @@ export default function AddRecordScreen({ navigation, route }: Props) {
         )}
 
         <Text style={styles.fieldLabel}>Date</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.textSecondary}
-          value={date}
-          onChangeText={setDate}
-        />
+        {Platform.OS === 'android' ? (
+          <Pressable style={({ pressed }) => [styles.dateButton, pressed && styles.ctaPressed]} onPress={openDatePicker}>
+            <Ionicons name="calendar-outline" size={18} color={colors.blue} />
+            <Text style={styles.dateButtonText}>{formatRecordDate(date)}</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.iosPickerWrap}>
+            <DateTimePicker
+              value={pickerDate}
+              mode="date"
+              display="compact"
+              maximumDate={new Date()}
+              onValueChange={(_event, selected) => setDate(toLocalISODate(selected))}
+            />
+          </View>
+        )}
+        {!hasValidDate && (
+          <Text style={styles.hintText}>Saved as “{date}”. Pick a date from the calendar to fix it.</Text>
+        )}
 
         {isDocumentType && (
           <>
@@ -198,7 +267,7 @@ export default function AddRecordScreen({ navigation, route }: Props) {
           disabled={isSubmitting}
         >
           <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
-          <Text style={typography.button}>{isSubmitting ? 'Saving...' : 'Save Record'}</Text>
+          <Text style={typography.button}>{isSubmitting ? 'Saving...' : editingId ? 'Save Changes' : 'Save Record'}</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -209,6 +278,16 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  centered: { alignItems: 'center', justifyContent: 'center' },
+  banner: { marginBottom: spacing.md },
+  dateButton: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+    paddingHorizontal: spacing.md, paddingVertical: 12, backgroundColor: colors.surface,
+  },
+  dateButtonText: { fontSize: 15, color: colors.textPrimary },
+  iosPickerWrap: { alignItems: 'flex-start' },
+  hintText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
   subtitle: { marginTop: spacing.xs, marginBottom: spacing.sm },
 
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },

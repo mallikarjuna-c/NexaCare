@@ -29,7 +29,6 @@ function dial(number: string) {
   openExternal(dialUrl(number), "Your phone couldn't open the dialer. Dial the number manually.");
 }
 
-// Emergency Assistance = preparation & reference. Acting fast happens in the SOS panel.
 export default function EmergencyScreen({ navigation }: Props) {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
@@ -52,7 +51,6 @@ export default function EmergencyScreen({ navigation }: Props) {
       setMedical(info);
       setLocationGranted(granted);
     } catch {
-      // SOS and helplines work without saved data, so we still render.
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +73,6 @@ export default function EmergencyScreen({ navigation }: Props) {
     }
   };
 
-  // Everything SOS needs, prepared calmly in advance.
   const readiness = [
     {
       key: 'contact',
@@ -89,7 +86,7 @@ export default function EmergencyScreen({ navigation }: Props) {
       done: hasMedicalInfo(medical),
       label: 'Medical ID',
       action: 'Add',
-      onPress: () => navigation.navigate('MedicalInfo'),
+      onPress: () => navigation.navigate('MedicalInfo', { profileId: user?.id }),
     },
     { key: 'location', done: locationGranted, label: 'Location access', action: 'Allow', onPress: allowLocation },
   ];
@@ -105,7 +102,6 @@ export default function EmergencyScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Way into the SOS panel — always first. */}
       <Pressable
         style={({ pressed }) => [styles.sosCard, pressed && styles.pressed]}
         onPress={() => navigation.navigate('Sos')}
@@ -126,7 +122,6 @@ export default function EmergencyScreen({ navigation }: Props) {
         <ActivityIndicator style={styles.loader} color={colors.primary} />
       ) : (
         <>
-          {/* Readiness */}
           {isReady ? (
             <View style={styles.readyBanner}>
               <Ionicons name="shield-checkmark" size={18} color={colors.green} />
@@ -157,7 +152,6 @@ export default function EmergencyScreen({ navigation }: Props) {
             </View>
           )}
 
-          {/* Trusted contacts */}
           <View style={styles.sectionHeaderRow}>
             <View style={styles.flexText}>
               <Text style={styles.sectionLabel}>Trusted contacts</Text>
@@ -216,13 +210,12 @@ export default function EmergencyScreen({ navigation }: Props) {
             </View>
           )}
 
-          {/* Medical ID */}
           <View style={[styles.sectionHeaderRow, styles.sectionSpacing]}>
             <View style={styles.flexText}>
               <Text style={styles.sectionLabel}>Medical ID</Text>
               <Text style={styles.sectionHintTight}>Included in your SOS message</Text>
             </View>
-            <Pressable onPress={() => navigation.navigate('MedicalInfo')} hitSlop={8}>
+            <Pressable onPress={() => navigation.navigate('MedicalInfo', { profileId: user?.id })} hitSlop={8}>
               <Text style={styles.linkText}>{hasMedicalInfo(medical) ? 'Edit' : 'Add'}</Text>
             </Pressable>
           </View>
@@ -248,7 +241,7 @@ export default function EmergencyScreen({ navigation }: Props) {
           ) : (
             <Pressable
               style={({ pressed }) => [styles.emptyCard, pressed && styles.pressed]}
-              onPress={() => navigation.navigate('MedicalInfo')}
+              onPress={() => navigation.navigate('MedicalInfo', { profileId: user?.id })}
             >
               <Ionicons name="id-card-outline" size={22} color={colors.textSecondary} />
               <Text style={styles.emptyText}>
@@ -258,7 +251,6 @@ export default function EmergencyScreen({ navigation }: Props) {
             </Pressable>
           )}
 
-          {/* Healthcare contacts from the directory */}
           <View style={[styles.sectionHeaderRow, styles.sectionSpacing]}>
             <View style={styles.flexText}>
               <Text style={styles.sectionLabel}>Healthcare contacts</Text>
@@ -289,7 +281,6 @@ export default function EmergencyScreen({ navigation }: Props) {
         </>
       )}
 
-      {/* Helplines — always available, even if saved data fails to load */}
       <Text style={[styles.sectionLabel, styles.sectionSpacing]}>Helplines</Text>
       <Text style={styles.sectionHint}>Numbers for India · tap to open your dialer</Text>
       <View style={styles.helplineGrid}>
@@ -308,7 +299,6 @@ export default function EmergencyScreen({ navigation }: Props) {
         ))}
       </View>
 
-      {/* Phone's built-in SOS — works even when the phone is locked, which an app can't. */}
       <View style={[styles.card, styles.builtInCard]}>
         <View style={styles.builtInHeader}>
           <Ionicons name="phone-portrait-outline" size={20} color={colors.textPrimary} />

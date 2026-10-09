@@ -2,9 +2,6 @@ import type { Ionicons } from '@expo/vector-icons';
 import type { HealthRecordType } from './healthRecords';
 import type { WatchMetricKey } from './smartwatch';
 
-// Health Trends (Module 11): one value per day, from the smartwatch (Health Connect) and/or
-// readings typed into Health Records.
-
 export type TrendMetric =
   | 'heartRate'
   | 'restingHeartRate'
@@ -16,14 +13,14 @@ export type TrendMetric =
   | 'weight'
   | 'glucose';
 
-export type TrendPoint = { day: string; value: number; value2?: number }; // day = local YYYY-MM-DD
+export type TrendPoint = { day: string; value: number; value2?: number };
 
 export type TrendSource = 'watch' | 'records';
 
 export type TrendResult = {
-  points: TrendPoint[]; // oldest first, only days with data
-  sources: TrendSource[]; // which sources actually contributed
-  watchApps: string[]; // package names of watch apps that contributed
+  points: TrendPoint[];
+  sources: TrendSource[];
+  watchApps: string[];
 };
 
 export type TrendDefinition = {
@@ -33,9 +30,9 @@ export type TrendDefinition = {
   icon: keyof typeof Ionicons.glyphMap;
   chart: 'line' | 'bar';
   decimals: number;
-  watchKey?: WatchMetricKey; // read from Health Connect
-  recordType?: HealthRecordType; // read from Health Records
-  band?: { lo: number; hi: number }; // healthy range, drawn as a light band
+  watchKey?: WatchMetricKey;
+  recordType?: HealthRecordType;
+  band?: { lo: number; hi: number };
   rangeText: string;
 };
 
@@ -81,9 +78,6 @@ export const TREND_METRICS: TrendDefinition[] = [
 export const TREND_PERIODS = [7, 30] as const;
 export type TrendPeriod = (typeof TREND_PERIODS)[number];
 
-// ---- Parsing typed-in Health Records values ----
-
-// Health Records store free text like "120/80", "72 bpm", "68 kg", "150 lb", "5.6 mmol/L".
 export function parseRecordValue(metric: TrendMetric, text: string): { value: number; value2?: number } | null {
   if (metric === 'bloodPressure') {
     const m = text.match(/(\d{2,3})\s*\/\s*(\d{2,3})/);

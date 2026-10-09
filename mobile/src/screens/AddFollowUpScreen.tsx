@@ -8,6 +8,8 @@ import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/d
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
+import ProfileBanner from '../components/ProfileBanner';
 import { FOLLOW_UP_BADGES } from '../components/FollowUpCard';
 import ProviderPicker, { type ProviderSelection } from '../components/ProviderPicker';
 import { addFollowUp, getFollowUpById, updateFollowUp } from '../services/followUpService';
@@ -44,7 +46,6 @@ const PROVIDER_LABELS: Record<FollowUpType, string> = {
   checkup: 'Doctor / Clinic',
 };
 
-// A picked provider hints at what kind of follow-up this is.
 const TYPE_FROM_PROVIDER: Partial<Record<ProviderType, FollowUpType>> = {
   lab: 'test',
   pharmacy: 'medication',
@@ -59,6 +60,8 @@ function defaultDate() {
 
 export default function AddFollowUpScreen({ navigation, route }: Props) {
   const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
   const editingId = route.params?.followUpId;
   const prefillProviderId = route.params?.providerId;
 
@@ -77,10 +80,9 @@ export default function AddFollowUpScreen({ navigation, route }: Props) {
     navigation.setOptions({ title: editingId ? 'Edit Follow-up' : 'Add Follow-up' });
   }, [navigation, editingId]);
 
-  // Prefill when editing.
   useEffect(() => {
-    if (!user || !editingId) return;
-    getFollowUpById(user.id, editingId)
+    if (!profileId || !editingId) return;
+    getFollowUpById(profileId, editingId)
       .then((existing) => {
         if (!existing) {
           Alert.alert('Not found', 'This follow-up no longer exists.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
@@ -96,14 +98,13 @@ export default function AddFollowUpScreen({ navigation, route }: Props) {
       })
       .catch(() => Alert.alert('Something went wrong', "We couldn't load this follow-up."))
       .finally(() => setIsLoadingExisting(false));
-  }, [user, editingId, navigation]);
+  }, [profileId, editingId, navigation]);
 
-  // Opened from a provider's page ("Book follow-up"): start linked to that provider.
   useEffect(() => {
     if (!user || editingId || !prefillProviderId) return;
     getProviderById(user.id, prefillProviderId)
       .then((p) => p && applyPickedProvider(p))
-      .catch(() => {}); // the user can still pick or type a provider
+      .catch(() => {});
   }, [user, editingId, prefillProviderId]);
 
   function applyPickedProvider(p: Provider) {
@@ -165,7 +166,7 @@ export default function AddFollowUpScreen({ navigation, route }: Props) {
   };
 
   const handleSave = async () => {
-    if (!user || isSubmitting) return;
+    if (!profileId || isSubmitting) return;
     if (!title.trim()) {
       setTitleError(true);
       return;
@@ -184,7 +185,7 @@ export default function AddFollowUpScreen({ navigation, route }: Props) {
 
     setIsSubmitting(true);
     try {
-      const result = editingId ? await updateFollowUp(user.id, editingId, input) : await addFollowUp(user.id, input);
+      const result = editingId ? await updateFollowUp(profileId, editingId, input) : await addFollowUp(profileId, input);
       explainReminder(result.reminder);
     } catch {
       Alert.alert('Something went wrong', "We couldn't save this follow-up. Please try again.");
@@ -204,6 +205,7 @@ export default function AddFollowUpScreen({ navigation, route }: Props) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ProfileBanner what="follow-ups" switchable={false} style={styles.banner} />
         <Text style={styles.fieldLabel}>Type</Text>
         <View style={styles.typeGrid}>
           {FOLLOW_UP_TYPES.map((t) => {
@@ -338,6 +340,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  banner: { marginBottom: spacing.xs },
   pressed: { opacity: 0.7 },
 
   fieldLabel: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs, marginTop: spacing.md },

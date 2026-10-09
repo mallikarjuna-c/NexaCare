@@ -1,11 +1,14 @@
 # NexaCare backend
 
-A small FastAPI server for the app's **Health Assistant**. It holds the Groq API key and calls
-Groq's free-plan model (`openai/gpt-oss-120b` by default). The mobile app only talks to this
-server and never sees the key.
+A FastAPI server for NexaCare. It handles:
 
-It runs in Docker because Windows Smart App Control blocks the compiled packages FastAPI needs
-when they're installed directly on Windows.
+- **Accounts**: sign-up and login with bcrypt-hashed passwords and 30-day login tokens.
+- **Health data**: records, follow-ups, expenses, Medical ID and watch summaries for each account.
+- **Family links**: share codes, approval, and view-only or edit access between accounts.
+- **Health Assistant**: calls Groq (`openai/gpt-oss-120b` by default). The app never sees the Groq key.
+
+Everything runs in Docker (the API plus a PostgreSQL database). Docker is needed because Windows
+Smart App Control blocks the compiled packages FastAPI needs when they're installed directly on Windows.
 
 ## First-time setup
 
@@ -24,23 +27,41 @@ docker compose up -d --build
 
 Check it: http://localhost:8010/health should show `"api_key_configured": true`.
 
-The phone reaches it through `adb reverse tcp:8010 tcp:8010`. That already runs as part of
-`npm run phone` and `npm run reconnect` in `mobile/`.
+- Your phone (USB or Wireless debugging) reaches it at `localhost:8010` through `adb reverse`, which
+  `npm run phone` and `npm run reconnect` in `mobile/` already set up.
+- Other phones on the same Wi-Fi use the PC's Wi-Fi address. On the Login screen, tap
+  **Server: …** and enter it, e.g. `192.168.1.5`.
 
 Useful commands:
 
 ```bash
-docker compose logs -f     # watch server logs
-docker compose down        # stop it
+docker compose logs -f api     # watch server logs
+docker compose down            # stop it (data is kept)
 ```
 
-After editing `main.py` or `.env`, run `docker compose up -d --build` again.
+After editing any `.py` file or `.env`, run `docker compose up -d --build` again.
+
+## Database
+
+- **Locally**, PostgreSQL runs in the `db` container. Its data lives in the Docker volume `pgdata`
+  and survives restarts and rebuilds. `docker compose down -v` deletes it, so don't use `-v`
+  unless you mean to wipe everything.
+- **Online**, put the hosted database's connection string in `.env`:
+  `DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require`
+  It overrides the local database. Nothing else changes.
+- `data/` (git-ignored) also holds `jwt_secret`, the key that signs login tokens. When the server
+  goes online, set `JWT_SECRET` in `.env` instead.
 
 ## API
 
-- `GET /health` reports the status, the model, and whether the key is configured.
-- `POST /assistant/chat` takes `{ "messages": [{ "role": "user" | "assistant", "content": "..." }], "health_context": "..." | null }`
-  and returns `{ "reply": "...", "refused": false }`.
+- `GET /health` reports the status, the model, and whether the Groq key is configured.
+- `POST /auth/signup`, `POST /auth/login`, `GET /auth/me`.
+- `GET|PUT /profiles/{id}/data/{records|followups|expenses|medical|watch}`. Allowed for the owner,
+  or for a linked account (view only, or view and edit). Only the owner can write `watch`.
+- `POST /links/code` creates a 24-hour code. `POST /links/request` sends a request using a code.
+  `GET /links` lists links. `POST /links/{id}/approve`, `PATCH /links/{id}` and `DELETE /links/{id}`
+  approve, change access and remove.
+- `POST /assistant/chat` requires a login.
 
 Safety rules live in `SYSTEM_PROMPT` in `main.py`: no diagnosis or dosing, emergency signs lead to
 112 and the SOS button, and self-harm leads to Tele-MANAS 14416. The app also shows its own
@@ -48,4 +69,6 @@ emergency banner without waiting for the AI.
 
 When "Use my health data" is on in the app, that data is sent to Groq's cloud with the question.
 
-The server listens on `127.0.0.1` only, so other devices on your Wi-Fi can't use your key.
+The API listens on port 8010 on your Wi-Fi so family phones can reach it. Everything except
+sign-up, login and `/health` needs a login token. The database container is not exposed outside
+Docker.

@@ -1,19 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { HomeStackParamList } from '../navigation/HomeStack';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
 import { getMedicalInfo, saveMedicalInfo } from '../services/emergencyService';
 import { BLOOD_GROUPS, type BloodGroup } from '../types/emergency';
 import { colors, typography, spacing } from '../theme/theme';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'MedicalInfo'>;
+type MedicalInfoRoute = RouteProp<{ MedicalInfo: { profileId?: string } | undefined }, 'MedicalInfo'>;
 
-export default function MedicalInfoScreen({ navigation }: Props) {
+export default function MedicalInfoScreen() {
+  const navigation = useNavigation();
+  const route = useRoute<MedicalInfoRoute>();
   const { user } = useAuth();
+  const { profiles } = useFamily();
+  const profileId = route.params?.profileId ?? user?.id;
+  const member = profiles.find((p) => p.id === profileId && !p.isSelf);
+  const readOnly = !!member && !member.canEdit;
+
+  useLayoutEffect(() => {
+    if (member) navigation.setOptions({ title: `Medical ID · ${member.name}` });
+  }, [navigation, member]);
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | undefined>();
   const [allergies, setAllergies] = useState('');
   const [conditions, setConditions] = useState('');
@@ -23,8 +33,8 @@ export default function MedicalInfoScreen({ navigation }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    getMedicalInfo(user.id)
+    if (!profileId) return;
+    getMedicalInfo(profileId)
       .then((info) => {
         setBloodGroup(info.bloodGroup);
         setAllergies(info.allergies ?? '');
@@ -34,13 +44,13 @@ export default function MedicalInfoScreen({ navigation }: Props) {
       })
       .catch(() => Alert.alert('Something went wrong', "We couldn't load your medical info."))
       .finally(() => setIsLoading(false));
-  }, [user]);
+  }, [profileId]);
 
   const handleSave = async () => {
-    if (!user || isSubmitting) return;
+    if (!profileId || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await saveMedicalInfo(user.id, {
+      await saveMedicalInfo(profileId, {
         bloodGroup,
         allergies: allergies.trim() || undefined,
         conditions: conditions.trim() || undefined,
@@ -69,7 +79,11 @@ export default function MedicalInfoScreen({ navigation }: Props) {
         <View style={styles.privacyNote}>
           <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
           <Text style={styles.privacyText}>
-            Stored only on this phone. It's shown on your Emergency screen and included when you share your location.
+            {member?.kind === 'linked'
+              ? `From ${member.name}’s NexaCare account.${readOnly ? ' You can view it but not change it.' : ''}`
+              : member
+                ? `Stored only on this phone. Included when you share ${member.name}'s health summary.`
+                : "Saved to your NexaCare account and kept on this phone for SOS. It's shown on your Emergency screen and included when you share your location."}
           </Text>
         </View>
 
@@ -80,13 +94,14 @@ export default function MedicalInfoScreen({ navigation }: Props) {
               key={g}
               style={[styles.bloodChip, bloodGroup === g && styles.bloodChipActive]}
               onPress={() => setBloodGroup(bloodGroup === g ? undefined : g)}
+              disabled={readOnly}
               accessibilityState={{ selected: bloodGroup === g }}
             >
               <Text style={[styles.bloodChipText, bloodGroup === g && styles.bloodChipTextActive]}>{g}</Text>
             </Pressable>
           ))}
         </View>
-        <Text style={styles.hintText}>Tap again to clear if you're not sure.</Text>
+        {!readOnly && <Text style={styles.hintText}>Tap again to clear if you're not sure.</Text>}
 
         <Text style={styles.fieldLabel}>Allergies</Text>
         <TextInput
@@ -96,6 +111,7 @@ export default function MedicalInfoScreen({ navigation }: Props) {
           value={allergies}
           onChangeText={setAllergies}
           multiline
+          editable={!readOnly}
         />
 
         <Text style={styles.fieldLabel}>Medical conditions</Text>
@@ -106,6 +122,7 @@ export default function MedicalInfoScreen({ navigation }: Props) {
           value={conditions}
           onChangeText={setConditions}
           multiline
+          editable={!readOnly}
         />
 
         <Text style={styles.fieldLabel}>Current medications</Text>
@@ -116,6 +133,7 @@ export default function MedicalInfoScreen({ navigation }: Props) {
           value={medications}
           onChangeText={setMedications}
           multiline
+          editable={!readOnly}
         />
 
         <Text style={styles.fieldLabel}>Other notes</Text>
@@ -126,22 +144,25 @@ export default function MedicalInfoScreen({ navigation }: Props) {
           value={notes}
           onChangeText={setNotes}
           multiline
+          editable={!readOnly}
         />
 
-        <Pressable
-          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, isSubmitting && styles.ctaDisabled]}
-          onPress={handleSave}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Text style={typography.button}>Save medical ID</Text>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-            </>
-          )}
-        </Pressable>
+        {!readOnly && (
+          <Pressable
+            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, isSubmitting && styles.ctaDisabled]}
+            onPress={handleSave}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Text style={typography.button}>Save medical ID</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              </>
+            )}
+          </Pressable>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

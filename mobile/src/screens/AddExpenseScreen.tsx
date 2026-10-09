@@ -10,6 +10,8 @@ import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/d
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
+import ProfileBanner from '../components/ProfileBanner';
 import { EXPENSE_BADGES } from '../components/ExpenseRow';
 import ProviderPicker, { type ProviderSelection } from '../components/ProviderPicker';
 import { addExpense, getExpenseById, updateExpense } from '../services/expenseService';
@@ -51,7 +53,6 @@ const PROVIDER_PLACEHOLDERS: Record<ExpenseCategory, string> = {
   other: 'e.g. Provider name',
 };
 
-// A picked provider hints at the expense category.
 const CATEGORY_FROM_PROVIDER: Record<ProviderType, ExpenseCategory> = {
   hospital: 'hospital',
   clinic: 'consultation',
@@ -65,6 +66,8 @@ type Errors = { amount?: string; title?: string };
 
 export default function AddExpenseScreen({ navigation, route }: Props) {
   const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
   const editingId = route.params?.expenseId;
   const prefillProviderId = route.params?.providerId;
 
@@ -88,8 +91,8 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
   }, [navigation, editingId]);
 
   useEffect(() => {
-    if (!user || !editingId) return;
-    getExpenseById(user.id, editingId)
+    if (!profileId || !editingId) return;
+    getExpenseById(profileId, editingId)
       .then((existing) => {
         if (!existing) {
           Alert.alert('Not found', 'This expense no longer exists.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
@@ -109,14 +112,13 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
       })
       .catch(() => Alert.alert('Something went wrong', "We couldn't load this expense."))
       .finally(() => setIsLoadingExisting(false));
-  }, [user, editingId, navigation]);
+  }, [profileId, editingId, navigation]);
 
-  // Opened from a provider's page ("Log expense"): start linked to that provider.
   useEffect(() => {
     if (!user || editingId || !prefillProviderId) return;
     getProviderById(user.id, prefillProviderId)
       .then((p) => p && applyPickedProvider(p))
-      .catch(() => {}); // the user can still pick or type a provider
+      .catch(() => {});
   }, [user, editingId, prefillProviderId]);
 
   function applyPickedProvider(p: Provider) {
@@ -128,7 +130,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
     DateTimePickerAndroid.open({
       value: date,
       mode: 'date',
-      maximumDate: new Date(), // expenses are things you've already paid
+      maximumDate: new Date(),
       onValueChange: (_event, selected) => setDate(selected),
     });
   };
@@ -167,7 +169,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
   };
 
   const handleSave = async () => {
-    if (!user || isSubmitting) return;
+    if (!profileId || isSubmitting) return;
 
     const amountPaise = parseAmountToPaise(amountText);
     const nextErrors: Errors = {};
@@ -193,8 +195,8 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
 
     setIsSubmitting(true);
     try {
-      if (editingId) await updateExpense(user.id, editingId, input);
-      else await addExpense(user.id, input);
+      if (editingId) await updateExpense(profileId, editingId, input);
+      else await addExpense(profileId, input);
       navigation.goBack();
     } catch {
       Alert.alert('Something went wrong', "We couldn't save this expense. Please try again.");
@@ -214,6 +216,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ProfileBanner what="expenses" switchable={false} style={styles.banner} />
         <View style={[styles.amountCard, errors.amount && styles.amountCardError]}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
@@ -379,6 +382,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  banner: { marginBottom: spacing.md },
   flexText: { flex: 1 },
   pressed: { opacity: 0.7 },
 

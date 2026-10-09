@@ -7,8 +7,6 @@ function keyFor(userId: string) {
   return `${PROGRESS_KEY_PREFIX}${userId}`;
 }
 
-// Static catalog for now — becomes a GET /challenges API call later.
-// This function is still async on purpose, so callers don't change when it does.
 const CHALLENGE_CATALOG: Challenge[] = [
   { id: 'c1', title: '10,000 Steps Challenge', description: 'Walk 10,000 steps every day for a week.', icon: 'walk-outline', goalValue: 70000, goalUnit: 'steps', durationDays: 7 },
   { id: 'c2', title: 'Daily Meditation', description: 'Meditate for at least 10 minutes a day.', icon: 'leaf-outline', goalValue: 100, goalUnit: 'minutes', durationDays: 10 },
@@ -45,7 +43,7 @@ export async function getJoinedChallengeIds(userId: string): Promise<string[]> {
 
 export async function joinChallenge(userId: string, challengeId: string): Promise<ChallengeProgress> {
   const all = await getAllProgress(userId);
-  if (all[challengeId]) return all[challengeId]; // already joined
+  if (all[challengeId]) return all[challengeId];
 
   const newProgress: ChallengeProgress = { challengeId, currentValue: 0, joinedAt: new Date().toISOString(), logs: [] };
   all[challengeId] = newProgress;
@@ -68,8 +66,6 @@ export async function logProgress(userId: string, challengeId: string, amount: n
   return updated;
 }
 
-// Mock leaderboard: a few generated participants plus the real user's own
-// live progress, clearly not real community data until a backend exists.
 export async function getLeaderboard(userId: string, challenge: Challenge): Promise<LeaderboardEntry[]> {
   const myProgress = await getProgress(userId, challenge.id);
   const mockNames = ['Aditi R.', 'Rahul K.', 'Priya S.', 'Vikram T.'];

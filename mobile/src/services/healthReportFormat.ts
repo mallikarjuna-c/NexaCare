@@ -1,4 +1,3 @@
-// Pure formatting for the shareable health summary — no device APIs, so it can be tested anywhere.
 import { RECORD_TYPE_LABELS, DOCUMENT_TYPES, type HealthRecord } from '../types/healthRecords';
 import { FOLLOW_UP_TYPE_LABELS, formatAbsolute, formatCalendarDate, type FollowUp } from '../types/followUps';
 import { EXPENSE_CATEGORY_LABELS, formatAmount, parseLocalISODate, type Expense } from '../types/expenses';
@@ -15,12 +14,10 @@ export type ReportData = {
 
 const DISCLAIMER = 'Patient-recorded data from the NexaCare app. Not clinically verified.';
 
-// Records store dates as typed text; show "Mon, 5 Oct 2026" when it's a valid YYYY-MM-DD.
 function displayDate(value: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatCalendarDate(parseLocalISODate(value)) : value;
 }
 
-// Everything user-typed goes through this before entering the HTML.
 function esc(value: string | undefined | null): string {
   return (value ?? '')
     .replace(/&/g, '&amp;')
@@ -45,8 +42,6 @@ function expenseTotals(items: Expense[]) {
 export function hasReportContent(data: ReportData): boolean {
   return !!data.medical || data.records.length > 0 || data.followUps.length > 0 || !!data.expenses?.items.length;
 }
-
-// ---------------- HTML (for the PDF) ----------------
 
 export function buildReportHtml(data: ReportData): string {
   const { vitals, documents } = splitRecords(data.records);
@@ -170,8 +165,6 @@ export function buildReportHtml(data: ReportData): string {
   <footer>${esc(DISCLAIMER)}</footer>
 </body></html>`;
 }
-
-// ---------------- Plain text (for chat apps) ----------------
 
 export function buildReportText(data: ReportData): string {
   const { vitals, documents } = splitRecords(data.records);

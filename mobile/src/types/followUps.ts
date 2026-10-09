@@ -1,6 +1,5 @@
 export type FollowUpType = 'appointment' | 'test' | 'medication' | 'checkup';
 
-// 'overdue' is not stored — it's derived from scheduledAt (see isOverdue).
 export type FollowUpStatus = 'scheduled' | 'completed' | 'cancelled';
 
 export type ReminderOffset = 'none' | 'at_time' | '1h' | '1d';
@@ -9,9 +8,9 @@ export type FollowUp = {
   id: string;
   type: FollowUpType;
   title: string;
-  scheduledAt: string; // ISO date-time
-  providerName?: string; // doctor / clinic / lab — kept even if the linked provider is removed
-  providerId?: string; // link to a saved provider in the Healthcare Directory
+  scheduledAt: string;
+  providerName?: string;
+  providerId?: string;
   location?: string;
   notes?: string;
   reminderOffset: ReminderOffset;
@@ -26,7 +25,6 @@ export type FollowUpInput = Pick<
   'type' | 'title' | 'scheduledAt' | 'providerName' | 'providerId' | 'location' | 'notes' | 'reminderOffset'
 >;
 
-// What happened when we tried to set the reminder, so the UI can tell the user honestly.
 export type ReminderOutcome = 'scheduled' | 'none' | 'time_passed' | 'permission_needed' | 'unsupported' | 'failed';
 
 export type FollowUpSaveResult = { followUp: FollowUp; reminder: ReminderOutcome };
@@ -64,8 +62,6 @@ export function isOverdue(followUp: FollowUp, now = Date.now()): boolean {
   return followUp.status === 'scheduled' && new Date(followUp.scheduledAt).getTime() < now;
 }
 
-// ---- Date formatting (manual, so output is identical on every device/locale) ----
-
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -80,13 +76,11 @@ export function formatClockTime(d: Date): string {
   return `${displayHour}:${String(d.getMinutes()).padStart(2, '0')} ${period}`;
 }
 
-// "Mon, 5 Oct" (adds the year when it isn't the current year)
 export function formatCalendarDate(d: Date): string {
   const base = `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
   return d.getFullYear() === new Date().getFullYear() ? base : `${base} ${d.getFullYear()}`;
 }
 
-// "Today", "Tomorrow", "Yesterday", or a calendar date
 export function formatRelativeDay(d: Date): string {
   const diffDays = Math.round((startOfDay(d) - startOfDay(new Date())) / 86_400_000);
   if (diffDays === 0) return 'Today';
@@ -95,13 +89,11 @@ export function formatRelativeDay(d: Date): string {
   return formatCalendarDate(d);
 }
 
-// For on-screen labels: "Tomorrow · 10:30 AM"
 export function formatWhen(iso: string): string {
   const d = new Date(iso);
   return `${formatRelativeDay(d)} · ${formatClockTime(d)}`;
 }
 
-// For text that's read later (e.g. notification bodies), where "Tomorrow" would go stale.
 export function formatAbsolute(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
   return `${formatCalendarDate(d)}, ${formatClockTime(d)}`;

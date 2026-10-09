@@ -6,8 +6,8 @@ export type ChatMessage = {
   id: string;
   role: ChatRole;
   text: string;
-  createdAt: string; // ISO
-  failed?: boolean; // user message whose request failed (shown with "Try again"; never sent as history)
+  createdAt: string;
+  failed?: boolean;
 };
 
 export const ASSISTANT_SUGGESTIONS: { icon: keyof typeof Ionicons.glyphMap; title: string; prompt: string }[] = [
@@ -17,8 +17,6 @@ export const ASSISTANT_SUGGESTIONS: { icon: keyof typeof Ionicons.glyphMap; titl
   { icon: 'fitness-outline', title: 'Blood pressure', prompt: 'What are simple ways to lower blood pressure naturally?' },
 ];
 
-// Phrases that suggest an emergency. When one matches, the chat shows the "Call 112 / SOS" banner
-// straight away, without waiting for the AI's reply.
 const EMERGENCY_PATTERN = new RegExp(
   [
     'chest (pain|pressure|tightness)',
@@ -38,15 +36,12 @@ export function looksLikeEmergency(text: string): boolean {
   return EMERGENCY_PATTERN.test(text);
 }
 
-// ---- Health context (only built when the user turns on "Use my health data") ----
-
 export type ContextMedical = { bloodGroup?: string; allergies?: string; conditions?: string; medications?: string };
 export type ContextWatchLine = { name: string; unit: string; latest: string; latestAt: string; average?: string };
 export type ContextRecordLine = { label: string; value: string; date: string };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// "9:05 AM" — the time under each chat message.
 export function formatChatTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -54,7 +49,6 @@ export function formatChatTime(iso: string): string {
   return `${h % 12 || 12}:${pad(d.getMinutes())} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
-// Local "YYYY-MM-DD HH:mm" — unambiguous for the AI.
 export function formatContextTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;

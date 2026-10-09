@@ -1,12 +1,7 @@
 import type { Ionicons } from '@expo/vector-icons';
 
-// Smartwatch / fitness data read from Android Health Connect (read-only).
-// Watch apps (Samsung Health, Fitbit, Google Fit, …) write into Health Connect; NexaCare only reads.
-
 export type Tone = 'good' | 'warn' | 'bad' | 'info';
 export type MetricStatus = { label: string; tone: Tone };
-
-// ---------------- Reference ranges (adult, at rest) ----------------
 
 export function heartRateStatus(bpm: number): MetricStatus {
   if (bpm < 50) return { label: 'Low', tone: 'warn' };
@@ -29,7 +24,6 @@ export function rmssdStatus(ms: number): MetricStatus {
   return { label: 'Very high', tone: 'info' };
 }
 
-// American Heart Association (2017) categories.
 export function bloodPressureStatus(sys: number, dia: number): MetricStatus {
   if (sys >= 180 || dia >= 120) return { label: 'Crisis', tone: 'bad' };
   if (sys >= 140 || dia >= 90) return { label: 'Stage 2 high', tone: 'bad' };
@@ -52,24 +46,23 @@ export type WatchMetricKey =
 
 export type WatchReading = {
   value: number;
-  value2?: number; // diastolic for blood pressure
-  time: string; // ISO
-  source: string; // app package that wrote it
+  value2?: number;
+  time: string;
+  source: string;
 };
 
-export type DailyValue = { day: string; value: number }; // day = local YYYY-MM-DD
+export type DailyValue = { day: string; value: number };
 
 export type WatchMetricSummary = {
   key: WatchMetricKey;
   latest: WatchReading | null;
-  average7d: number | null; // daily totals for steps/sleep, otherwise average of readings
+  average7d: number | null;
   count: number;
-  granted: boolean; // did the user allow this data type?
-  daily: DailyValue[]; // one value per day that has data (steps = total, sleep = hours, others = average)
-  daily2?: DailyValue[]; // blood pressure only: diastolic per day (daily = systolic)
+  granted: boolean;
+  daily: DailyValue[];
+  daily2?: DailyValue[];
 };
 
-// Display scale for each metric's range bar: the whole bar, and the healthy band inside it.
 export const WATCH_SCALES: Record<WatchMetricKey, { min: number; max: number; normalLo: number; normalHi: number }> = {
   heartRate: { min: 40, max: 140, normalLo: 60, normalHi: 100 },
   restingHeartRate: { min: 40, max: 110, normalLo: 60, normalHi: 100 },
@@ -113,7 +106,6 @@ export const WATCH_METRICS: {
   { key: 'sleep', name: 'Sleep', unit: 'h', icon: 'moon-outline', averageLabel: 'Nightly avg' },
 ];
 
-// SpO2 at rest, adults at sea level.
 export function spo2Status(pct: number): MetricStatus {
   if (pct >= 95) return { label: 'Normal', tone: 'good' };
   if (pct >= 90) return { label: 'Low', tone: 'warn' };
@@ -159,7 +151,6 @@ export function formatWatchValue(key: WatchMetricKey, r: WatchReading): string {
   return String(Math.round(r.value));
 }
 
-// Friendly names for common apps that write to Health Connect.
 const SOURCE_NAMES: Record<string, string> = {
   'com.sec.android.app.shealth': 'Samsung Health',
   'com.google.android.apps.fitness': 'Google Fit',
@@ -180,7 +171,6 @@ const SOURCE_NAMES: Record<string, string> = {
   'com.google.android.apps.fitness.wear': 'Google Fit',
 };
 
-// Health Connect only tells us the package name, so unknown apps get a neutral label instead of a code.
 export function sourceAppName(pkg: string): string {
   if (SOURCE_NAMES[pkg]) return SOURCE_NAMES[pkg];
   if (!pkg || pkg === 'unknown') return 'Unknown app';

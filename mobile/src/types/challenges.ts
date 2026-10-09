@@ -2,16 +2,16 @@ export type Challenge = {
   id: string;
   title: string;
   description: string;
-  icon: string; // Ionicons name, kept as string to avoid a circular type import
+  icon: string;
   goalValue: number;
-  goalUnit: string; // "steps", "minutes", "km", etc.
+  goalUnit: string;
   durationDays: number;
 };
 
 export type ChallengeProgress = {
   challengeId: string;
   currentValue: number;
-  joinedAt: string; // ISO timestamp
+  joinedAt: string;
   logs: { date: string; value: number }[];
 };
 

@@ -1,29 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadData, removeLocalData, saveData } from './profileStore';
 import type { Expense, ExpenseInput } from '../types/expenses';
 
-const KEY_PREFIX = 'nexacare_expenses_';
-
-function keyFor(userId: string) {
-  return `${KEY_PREFIX}${userId}`;
-}
-
 async function readAll(userId: string): Promise<Expense[]> {
-  const raw = await AsyncStorage.getItem(keyFor(userId));
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Expense[]) : [];
-  } catch {
-    console.warn('Expense data was unreadable.');
-    return [];
-  }
+  const list = await loadData<Expense[]>('expenses', userId, []);
+  return Array.isArray(list) ? list : [];
 }
 
 async function writeAll(userId: string, list: Expense[]): Promise<void> {
-  await AsyncStorage.setItem(keyFor(userId), JSON.stringify(list));
+  await saveData('expenses', userId, list);
 }
 
-// Newest first: by expense date, then by when it was entered.
+export async function removeAllExpenses(userId: string): Promise<void> {
+  await removeLocalData('expenses', userId);
+}
+
 export async function getExpenses(userId: string): Promise<Expense[]> {
   const list = await readAll(userId);
   return list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));

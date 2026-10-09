@@ -42,7 +42,6 @@ const TONE_STYLES: Record<Tone, { bg: string; fg: string }> = {
 };
 
 const HEALTH_CONNECT_STORE_URL = 'market://details?id=com.google.android.apps.healthdata';
-// From Android 14 (API 34) Health Connect is part of the operating system.
 const HEALTH_CONNECT_BUILT_IN = Platform.OS === 'android' && Number(Platform.Version) >= 34;
 
 const SECTIONS: { title: string; keys: WatchMetricKey[] }[] = [
@@ -59,7 +58,6 @@ function isoDay(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// The last 7 calendar days (oldest first), filling days without data with 0.
 function lastSevenDays(daily: DailyValue[]): { day: string; letter: string; value: number; isToday: boolean }[] {
   const byDay = new Map(daily.map((d) => [d.day, d.value]));
   return Array.from({ length: 7 }, (_, i) => {
@@ -82,7 +80,6 @@ function RangeBar({ value, metricKey, tone }: { value: number; metricKey: WatchM
   );
 }
 
-// Seven slim bars, today in full green, a dashed goal line; tap a bar to see that day's count.
 function WeeklySteps({ daily }: { daily: DailyValue[] }) {
   const days = useMemo(() => lastSevenDays(daily), [daily]);
   const [selected, setSelected] = useState(days.length - 1);
@@ -236,7 +233,6 @@ export default function SmartwatchScreen() {
         isLive ? <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={colors.green} colors={[colors.green]} /> : undefined
       }
     >
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.flex}>
           <Text style={styles.pageTitle}>Smartwatch</Text>
@@ -263,7 +259,6 @@ export default function SmartwatchScreen() {
         </View>
       )}
 
-      {/* ---------- Health Connect not usable ---------- */}
       {status === 'unavailable' &&
         (HEALTH_CONNECT_BUILT_IN ? (
           <View style={styles.card}>
@@ -301,7 +296,6 @@ export default function SmartwatchScreen() {
         </View>
       )}
 
-      {/* ---------- Not connected: onboarding ---------- */}
       {status === 'available' && !connected && (
         <>
           <View style={styles.hero}>
@@ -363,7 +357,6 @@ export default function SmartwatchScreen() {
         </>
       )}
 
-      {/* ---------- Connected ---------- */}
       {isLive && metrics && (
         <>
           {!anyData ? (
@@ -377,7 +370,6 @@ export default function SmartwatchScreen() {
             </View>
           ) : (
             <>
-              {/* Today */}
               <View style={styles.hero}>
                 <View style={styles.heroLeaf} pointerEvents="none">
                   <LeafAccent size={150} color={colors.green} rotation={200} opacity={0.12} />
@@ -445,7 +437,6 @@ export default function SmartwatchScreen() {
             </>
           )}
 
-          {/* Sections */}
           {SECTIONS.map((section) => (
             <View key={section.title}>
               <Text style={styles.sectionLabel}>{section.title}</Text>
@@ -510,7 +501,6 @@ export default function SmartwatchScreen() {
             </View>
           ))}
 
-          {/* Sources & settings */}
           <Text style={styles.sectionLabel}>Data sources</Text>
           <View style={styles.card}>
             {sources.length ? (

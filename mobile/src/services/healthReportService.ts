@@ -5,7 +5,6 @@ import { buildReportHtml, buildReportText, type ReportData } from './healthRepor
 
 export { hasReportContent, type ReportData } from './healthReportFormat';
 
-// Renders the summary to a PDF file and opens the share sheet (WhatsApp, email, Drive…).
 export async function sharePdfReport(data: ReportData): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device.');
   const { uri } = await Print.printToFileAsync({ html: buildReportHtml(data) });

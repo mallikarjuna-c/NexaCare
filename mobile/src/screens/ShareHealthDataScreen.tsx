@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
-import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
+import ProfileBanner from '../components/ProfileBanner';
 import { getAllRecords } from '../services/healthRecordsService';
 import { getFollowUps } from '../services/followUpService';
 import { getExpenses } from '../services/expenseService';
@@ -35,7 +36,8 @@ function cutoffFor(period: Period): string | null {
 }
 
 export default function ShareHealthDataScreen({ route }: Props) {
-  const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
   const preselectedIds = route.params?.recordIds;
 
   const [records, setRecords] = useState<HealthRecord[]>([]);
@@ -54,15 +56,14 @@ export default function ShareHealthDataScreen({ route }: Props) {
   const [busy, setBusy] = useState<'pdf' | 'text' | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    Promise.all([getAllRecords(user.id), getFollowUps(user.id), getExpenses(user.id), getMedicalInfo(user.id)])
+    if (!profileId) return;
+    Promise.all([getAllRecords(profileId), getFollowUps(profileId), getExpenses(profileId), getMedicalInfo(profileId)])
       .then(([r, f, e, m]) => {
         setRecords(r);
         setFollowUps(f.filter((x) => x.status === 'scheduled' && !isOverdue(x)));
         setExpenses(e);
         setMedical(m);
         if (!hasMedicalInfo(m)) setIncludeMedical(false);
-        // Coming from "Share this record": keep that selection. Otherwise start with the whole default period.
         if (!preselectedIds) {
           const cutoff = cutoffFor('3m');
           setSelectedIds(new Set(r.filter((x) => !cutoff || x.date >= cutoff).map((x) => x.id)));
@@ -70,7 +71,7 @@ export default function ShareHealthDataScreen({ route }: Props) {
       })
       .catch(() => setLoadError(true))
       .finally(() => setIsLoading(false));
-  }, [user, preselectedIds]);
+  }, [profileId, preselectedIds]);
 
   const cutoff = cutoffFor(period);
   const recordsInPeriod = useMemo(
@@ -100,7 +101,7 @@ export default function ShareHealthDataScreen({ route }: Props) {
   const allSelected = recordsInPeriod.length > 0 && selectedInPeriod.length === recordsInPeriod.length;
 
   const reportData: ReportData = {
-    patientName: user?.name ?? 'Patient',
+    patientName: activeProfile?.name ?? 'Patient',
     generatedAt: new Date(),
     medical: includeMedical && hasMedicalInfo(medical) ? medical : undefined,
     records: selectedInPeriod,
@@ -154,6 +155,7 @@ export default function ShareHealthDataScreen({ route }: Props) {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
+        <ProfileBanner what="report" switchable={false} style={styles.banner} />
         <View style={styles.introCard}>
           <View style={styles.introIcon}>
             <Ionicons name="document-text-outline" size={22} color={colors.badge.blueIcon} />
@@ -163,7 +165,6 @@ export default function ShareHealthDataScreen({ route }: Props) {
           </Text>
         </View>
 
-        {/* Period — applies to records and expenses */}
         <Text style={styles.fieldLabel}>Time period</Text>
         <View style={styles.chipRow}>
           {PERIODS.map((p) => (
@@ -173,7 +174,6 @@ export default function ShareHealthDataScreen({ route }: Props) {
           ))}
         </View>
 
-        {/* Medical ID */}
         <View style={[styles.card, styles.sectionCard]}>
           <View style={styles.toggleRow}>
             <Ionicons name="id-card-outline" size={20} color={colors.danger} />
@@ -193,7 +193,6 @@ export default function ShareHealthDataScreen({ route }: Props) {
           </View>
         </View>
 
-        {/* Records */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionLabel}>
             Health records <Text style={styles.sectionCount}>{selectedInPeriod.length}/{recordsInPeriod.length}</Text>
@@ -245,7 +244,6 @@ export default function ShareHealthDataScreen({ route }: Props) {
           </View>
         )}
 
-        {/* Follow-ups & expenses */}
         <View style={[styles.card, styles.sectionCard]}>
           <View style={styles.toggleRow}>
             <Ionicons name="calendar-outline" size={20} color={colors.badge.purpleIcon} />
@@ -300,7 +298,6 @@ export default function ShareHealthDataScreen({ route }: Props) {
         </View>
       </ScrollView>
 
-      {/* Sticky action bar */}
       <View style={styles.actionBar}>
         <Text style={styles.summaryText} numberOfLines={1}>
           {canShare ? summaryParts.join(' · ') : 'Choose at least one thing to share'}
@@ -340,6 +337,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.xl },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  banner: { marginBottom: spacing.md },
   flexText: { flex: 1 },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.45 },

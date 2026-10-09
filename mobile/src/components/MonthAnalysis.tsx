@@ -8,14 +8,12 @@ import { parseLocalISODate } from '../types/expenses';
 import { TREND_METRICS, formatTrendValue, type TrendMetric, type TrendResult } from '../types/trends';
 import { colors, spacing } from '../theme/theme';
 
-// Home's "Wellness Summary" card: pick a metric, see every day from the 1st to today, plus lowest/highest.
-
 const HOME_METRICS: TrendMetric[] = ['bloodPressure', 'heartRate', 'steps', 'sleep', 'spo2', 'hrv'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 type Props = {
   userId: string;
-  refreshKey: number; // bump to reload (e.g. when Home regains focus)
+  refreshKey: number;
   onViewAll: (metric: TrendMetric) => void;
   onConnectWatch: () => void;
 };
@@ -27,7 +25,6 @@ export default function MonthAnalysis({ userId, refreshKey, onViewAll, onConnect
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const today = new Date();
-  // Days so far this month (at least 2 so the chart has width to draw on the 1st).
   const days = Math.max(2, today.getDate());
   const def = TREND_METRICS.find((m) => m.key === metric)!;
 

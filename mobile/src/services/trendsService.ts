@@ -10,8 +10,6 @@ import {
   type TrendSource,
 } from '../types/trends';
 
-// One value per day for a metric over the last `days` days, combining the watch and Health Records.
-// When both have a value for the same day, they're averaged.
 export async function getTrend(userId: string, metric: TrendMetric, days: number): Promise<TrendResult> {
   const def = TREND_METRICS.find((m) => m.key === metric)!;
   const start = new Date();
@@ -43,7 +41,7 @@ export async function getTrend(userId: string, metric: TrendMetric, days: number
   }
 
   for (const r of records) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) continue; // typed dates we can't place on a timeline
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) continue;
     const parsed = parseRecordValue(metric, r.value);
     if (!parsed) continue;
     add(r.date, parsed.value, parsed.value2);

@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
-import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
+import ProfileBanner from '../components/ProfileBanner';
 import ExpenseRow, { EXPENSE_BADGES } from '../components/ExpenseRow';
 import { getExpenses } from '../services/expenseService';
 import { formatRelativeDay } from '../types/followUps';
@@ -27,7 +28,9 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'Expenses'>;
 const DANGER_TINT = '#FCE1E1';
 
 export default function ExpensesScreen({ navigation }: Props) {
-  const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
+  const canEdit = activeProfile?.canEdit ?? true;
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [month, setMonth] = useState<MonthKey>(currentMonthKey);
   const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | null>(null);
@@ -35,16 +38,16 @@ export default function ExpensesScreen({ navigation }: Props) {
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!profileId) return;
     setLoadError(false);
     try {
-      setExpenses(await getExpenses(user.id));
+      setExpenses(await getExpenses(profileId));
     } catch {
       setLoadError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [profileId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -90,7 +93,6 @@ export default function ExpensesScreen({ navigation }: Props) {
     (e) => e.date.startsWith(month) && (!categoryFilter || e.category === categoryFilter)
   );
 
-  // Group by day, keeping the newest-first order from the service.
   const groups: { date: string; items: Expense[] }[] = [];
   for (const e of monthExpenses) {
     const last = groups[groups.length - 1];
@@ -100,6 +102,7 @@ export default function ExpensesScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ProfileBanner what="expenses" style={styles.banner} />
       <View style={styles.headerRow}>
         <View style={styles.monthSwitcher}>
           <Pressable onPress={() => changeMonth(-1)} hitSlop={10} style={styles.monthArrow} accessibilityLabel="Previous month">
@@ -116,16 +119,17 @@ export default function ExpensesScreen({ navigation }: Props) {
             <Ionicons name="chevron-forward" size={20} color={colors.textPrimary} />
           </Pressable>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-          onPress={() => navigation.navigate('AddExpense')}
-        >
-          <Ionicons name="add" size={18} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Add</Text>
-        </Pressable>
+        {canEdit && (
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('AddExpense')}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Add</Text>
+          </Pressable>
+        )}
       </View>
 
-      {/* Hero total */}
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total spent</Text>
         <Text style={styles.totalValue}>{formatAmount(summary.total)}</Text>
@@ -166,17 +170,18 @@ export default function ExpensesScreen({ navigation }: Props) {
           <Text style={styles.stateBody}>
             Log consultation fees, medicine bills and lab costs to see where your healthcare money goes.
           </Text>
-          <Pressable
-            style={({ pressed }) => [styles.pillButton, styles.stateButton, pressed && styles.pressed]}
-            onPress={() => navigation.navigate('AddExpense')}
-          >
-            <Text style={styles.pillButtonText}>Add expense</Text>
-            <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-          </Pressable>
+          {canEdit && (
+            <Pressable
+              style={({ pressed }) => [styles.pillButton, styles.stateButton, pressed && styles.pressed]}
+              onPress={() => navigation.navigate('AddExpense')}
+            >
+              <Text style={styles.pillButtonText}>Add expense</Text>
+              <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+            </Pressable>
+          )}
         </View>
       ) : (
         <>
-          {/* Category breakdown: one hue, sorted largest first; the label + icon carry identity. */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionLabel}>By category</Text>
             {categoryFilter && (
@@ -247,6 +252,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  banner: { marginBottom: spacing.md },
   flexText: { flex: 1 },
   pressed: { opacity: 0.7 },
 

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { loadData, saveData } from './profileStore';
 import {
   SdkAvailabilityStatus,
   getGrantedPermissions,
@@ -20,7 +21,6 @@ import type {
   WatchSummary,
 } from '../types/smartwatch';
 
-// Which Health Connect record type backs each NexaCare metric.
 const RECORD_FOR: Record<WatchMetricKey, RecordType> = {
   heartRate: 'HeartRate',
   restingHeartRate: 'RestingHeartRate',
@@ -58,8 +58,6 @@ export async function getHealthConnectStatus(): Promise<HealthConnectStatus> {
   }
 }
 
-// "Connected" is NexaCare's own per-user switch. Health Connect permissions belong to the whole app,
-// and revoking them only takes effect after an app restart — so we track the user's choice ourselves.
 export async function isWatchConnected(userId: string): Promise<boolean> {
   return (await AsyncStorage.getItem(`${CONNECTED_PREFIX}${userId}`)) === 'true';
 }
@@ -69,7 +67,6 @@ export async function setWatchConnected(userId: string, connected: boolean): Pro
   else await AsyncStorage.removeItem(`${CONNECTED_PREFIX}${userId}`);
 }
 
-// Shows Android's Health Connect permission screen. Returns the record types the user allowed.
 export async function connectHealthConnect(userId: string): Promise<RecordType[]> {
   if (!(await ensureInitialized())) throw new Error('Health Connect could not be started.');
   const granted = await requestPermission(READ_PERMISSIONS);
@@ -92,8 +89,6 @@ export async function getGrantedTypes(): Promise<RecordType[]> {
 export function openHealthConnect() {
   openHealthConnectSettings();
 }
-
-// ---------------- Reading ----------------
 
 async function readAll<T extends RecordType>(recordType: T, startTime: string, endTime: string) {
   const out = [];
@@ -118,13 +113,11 @@ function emptySummary(key: WatchMetricKey, granted: boolean): WatchMetricSummary
   return { key, latest: null, average7d: null, count: 0, granted, daily: [] };
 }
 
-// Local calendar day (YYYY-MM-DD) for grouping readings into days.
 function isoDay(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// One value per day, oldest first: the day's total (steps) or the day's average (everything else).
 function dailyValues(readings: { value: number; time: string }[], mode: 'sum' | 'avg'): DailyValue[] {
   const byDay = new Map<string, number[]>();
   for (const r of readings) {
@@ -234,7 +227,6 @@ async function summarise(key: WatchMetricKey, start: string, end: string): Promi
   }
 }
 
-// Reads the last 7 days for every metric the user allowed. One failing type doesn't break the rest.
 export async function getWatchSummary(): Promise<WatchSummary> {
   const grantedTypes = await getGrantedTypes();
   const end = new Date();
@@ -257,8 +249,6 @@ export async function getWatchSummary(): Promise<WatchSummary> {
   return { fetchedAt: end.toISOString(), metrics: Object.fromEntries(entries) as WatchSummary['metrics'] };
 }
 
-// Daily values for one metric over the last `days` days — for the Trends screen.
-// Returns null when the watch isn't connected or this data type isn't allowed.
 export async function getWatchDaily(
   userId: string,
   key: WatchMetricKey,
@@ -278,7 +268,14 @@ export async function getWatchDaily(
   }
 }
 
-// Latest blood pressure from the watch / cuff app, for the wellness report's BP card.
+export async function uploadWatchSummary(userId: string, summary: WatchSummary): Promise<void> {
+  await saveData('watch', userId, summary);
+}
+
+export async function getSharedWatchSummary(profileId: string): Promise<WatchSummary | null> {
+  return loadData<WatchSummary | null>('watch', profileId, null);
+}
+
 export async function getLatestWatchBp(userId: string): Promise<WatchReading | null> {
   try {
     if (Platform.OS !== 'android' || !(await isWatchConnected(userId))) return null;

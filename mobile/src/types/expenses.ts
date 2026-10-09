@@ -7,14 +7,13 @@ export type ReceiptType = 'pdf' | 'image';
 export type Expense = {
   id: string;
   title: string;
-  // Stored as whole paise (₹1 = 100). Floating-point rupees drift: 0.1 + 0.2 !== 0.3.
   amountPaise: number;
   category: ExpenseCategory;
-  date: string; // YYYY-MM-DD, local date
-  providerName?: string; // kept even if the linked provider is removed
-  providerId?: string; // link to a saved provider in the Healthcare Directory
+  date: string;
+  providerName?: string;
+  providerId?: string;
   paymentMethod: PaymentMethod;
-  claimable: boolean; // can be claimed from insurance
+  claimable: boolean;
   notes?: string;
   receiptUri?: string;
   receiptName?: string;
@@ -46,9 +45,6 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 
 export const PAYMENT_METHODS = Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[];
 
-// ---- Money ----
-
-// Indian digit grouping: 1,23,45,678
 function groupIndian(digits: string): string {
   const last3 = digits.slice(-3);
   const rest = digits.slice(0, -3);
@@ -63,7 +59,6 @@ export function formatAmount(paise: number): string {
   return `${sign}₹${rupees}${fraction ? `.${String(fraction).padStart(2, '0')}` : ''}`;
 }
 
-// "1,250.5" -> 125050. Returns null for anything that isn't a positive amount with ≤ 2 decimals.
 export function parseAmountToPaise(text: string): number | null {
   const cleaned = text.replace(/[,\s₹]/g, '');
   if (!/^\d+(\.\d{0,2})?$/.test(cleaned)) return null;
@@ -73,21 +68,17 @@ export function parseAmountToPaise(text: string): number | null {
   return paise;
 }
 
-// 125050 -> "1250.50" (for prefilling the input when editing)
 export function paiseToInput(paise: number): string {
   const whole = Math.floor(paise / 100);
   const fraction = paise % 100;
   return fraction ? `${whole}.${String(fraction).padStart(2, '0')}` : String(whole);
 }
 
-// ---- Dates ----
-
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-// Local date as YYYY-MM-DD. (toISOString() would use UTC and can land on the wrong day.)
 export function toLocalISODate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -97,7 +88,7 @@ export function parseLocalISODate(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export type MonthKey = string; // YYYY-MM
+export type MonthKey = string;
 
 export function currentMonthKey(): MonthKey {
   return toLocalISODate(new Date()).slice(0, 7);
@@ -116,13 +107,11 @@ export function formatMonthLabel(key: MonthKey, short = false): string {
   return y === new Date().getFullYear() ? name : `${name} ${y}`;
 }
 
-// ---- Summaries ----
-
 export type MonthSummary = {
-  total: number; // paise
+  total: number;
   count: number;
-  claimableTotal: number; // paise
-  byCategory: { category: ExpenseCategory; total: number }[]; // largest first, zero totals omitted
+  claimableTotal: number;
+  byCategory: { category: ExpenseCategory; total: number }[];
 };
 
 export function summarizeMonth(expenses: Expense[], month: MonthKey): MonthSummary {

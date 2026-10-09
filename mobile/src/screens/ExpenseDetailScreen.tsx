@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
 import { EXPENSE_BADGES } from '../components/ExpenseRow';
 import { deleteExpense, getExpenseById } from '../services/expenseService';
 import { getProviderById } from '../services/directoryService';
@@ -19,17 +20,19 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'ExpenseDetail'>;
 export default function ExpenseDetailScreen({ navigation, route }: Props) {
   const { expenseId } = route.params;
   const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
+  const canEdit = activeProfile?.canEdit ?? true;
   const [expense, setExpense] = useState<Expense | null>(null);
   const [linkedProviderId, setLinkedProviderId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user || !profileId) return;
     try {
-      const item = await getExpenseById(user.id, expenseId);
+      const item = await getExpenseById(profileId, expenseId);
       setExpense(item);
-      // Only link through if the provider still exists in the directory.
       const provider = item?.providerId ? await getProviderById(user.id, item.providerId) : null;
       setLinkedProviderId(provider?.id ?? null);
     } catch {
@@ -37,9 +40,8 @@ export default function ExpenseDetailScreen({ navigation, route }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, expenseId]);
+  }, [user, profileId, expenseId]);
 
-  // Refresh after returning from the edit screen.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const confirmDelete = () =>
@@ -49,10 +51,10 @@ export default function ExpenseDetailScreen({ navigation, route }: Props) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          if (!user) return;
+          if (!profileId) return;
           setIsDeleting(true);
           try {
-            await deleteExpense(user.id, expenseId);
+            await deleteExpense(profileId, expenseId);
             navigation.goBack();
           } catch {
             setIsDeleting(false);
@@ -159,27 +161,31 @@ export default function ExpenseDetailScreen({ navigation, route }: Props) {
         </View>
       ) : null}
 
-      <View style={styles.actionsRow}>
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-          onPress={() => navigation.navigate('AddExpense', { expenseId })}
-          disabled={isDeleting}
-        >
-          <Ionicons name="create-outline" size={18} color={colors.green} />
-          <Text style={styles.secondaryText}>Edit</Text>
-        </Pressable>
-      </View>
+      {canEdit && (
+        <>
+          <View style={styles.actionsRow}>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              onPress={() => navigation.navigate('AddExpense', { expenseId })}
+              disabled={isDeleting}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.green} />
+              <Text style={styles.secondaryText}>Edit</Text>
+            </Pressable>
+          </View>
 
-      <Pressable style={styles.deleteButton} onPress={confirmDelete} disabled={isDeleting} hitSlop={8}>
-        {isDeleting ? (
-          <ActivityIndicator size="small" color={colors.danger} />
-        ) : (
-          <>
-            <Ionicons name="trash-outline" size={16} color={colors.danger} />
-            <Text style={styles.deleteText}>Delete expense</Text>
-          </>
-        )}
-      </Pressable>
+          <Pressable style={styles.deleteButton} onPress={confirmDelete} disabled={isDeleting} hitSlop={8}>
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={colors.danger} />
+            ) : (
+              <>
+                <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                <Text style={styles.deleteText}>Delete expense</Text>
+              </>
+            )}
+          </Pressable>
+        </>
+      )}
     </ScrollView>
   );
 }

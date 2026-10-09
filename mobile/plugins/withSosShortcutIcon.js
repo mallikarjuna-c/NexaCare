@@ -1,5 +1,3 @@
-// Expo config plugin: puts the SOS app-shortcut icon into the Android project.
-// The android/ folder is generated (and git-ignored), so the source of truth lives in native-assets/.
 const fs = require('fs');
 const path = require('path');
 const { withDangerousMod } = require('expo/config-plugins');

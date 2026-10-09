@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isLinkedProfile, loadData, removeLocalData, saveData } from './profileStore';
 import {
   cancelReminder,
   getPermissionState,
@@ -7,6 +7,7 @@ import {
   scheduleReminderAt,
   userScopedId,
 } from './notificationService';
+import { getMemberName } from './familyService';
 import {
   FOLLOW_UP_TYPE_LABELS,
   formatAbsolute,
@@ -18,40 +19,24 @@ import {
   type ReminderOutcome,
 } from '../types/followUps';
 
-const KEY_PREFIX = 'nexacare_followups_';
-
-function keyFor(userId: string) {
-  return `${KEY_PREFIX}${userId}`;
-}
-
-// Deterministic, so we never need to store it — and user-scoped, so logout clears it.
 function reminderIdFor(userId: string, followUpId: string) {
   return userScopedId(userId, `followup_${followUpId}`);
 }
 
 async function readAll(userId: string): Promise<FollowUp[]> {
-  const raw = await AsyncStorage.getItem(keyFor(userId));
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as FollowUp[]) : [];
-  } catch {
-    console.warn('Follow-up data was unreadable.');
-    return [];
-  }
+  const list = await loadData<FollowUp[]>('followups', userId, []);
+  return Array.isArray(list) ? list : [];
 }
 
 async function writeAll(userId: string, list: FollowUp[]): Promise<void> {
-  await AsyncStorage.setItem(keyFor(userId), JSON.stringify(list));
+  await saveData('followups', userId, list);
 }
 
-// Brings the device's scheduled reminder in line with the follow-up.
-// promptForPermission is true when the user is actively saving, false for background restores.
 async function syncReminder(userId: string, followUp: FollowUp, promptForPermission: boolean): Promise<ReminderOutcome> {
   const identifier = reminderIdFor(userId, followUp.id);
   await cancelReminder(identifier);
 
-  if (followUp.status !== 'scheduled') return 'none';
+  if (followUp.status !== 'scheduled' || isLinkedProfile(userId)) return 'none';
   const at = reminderTimeFor(followUp.scheduledAt, followUp.reminderOffset);
   if (!at) return 'none';
   if (at.getTime() <= Date.now()) return 'time_passed';
@@ -60,7 +45,8 @@ async function syncReminder(userId: string, followUp: FollowUp, promptForPermiss
   if (permission === 'unsupported') return 'unsupported';
   if (permission !== 'granted') return 'permission_needed';
 
-  const title = `${FOLLOW_UP_TYPE_LABELS[followUp.type]} reminder`;
+  const memberName = await getMemberName(userId).catch(() => null);
+  const title = `${FOLLOW_UP_TYPE_LABELS[followUp.type]} reminder${memberName ? ` · ${memberName}` : ''}`;
   const body = [followUp.title, formatAbsolute(followUp.scheduledAt), followUp.providerName].filter(Boolean).join(' · ');
 
   try {
@@ -111,7 +97,6 @@ export async function updateFollowUp(userId: string, id: string, input: FollowUp
   return { followUp, reminder };
 }
 
-// Completing or cancelling removes the reminder; reopening restores it (without prompting).
 export async function setFollowUpStatus(userId: string, id: string, status: FollowUpStatus): Promise<FollowUp> {
   const list = await readAll(userId);
   const existing = list.find((f) => f.id === id);
@@ -135,7 +120,12 @@ export async function deleteFollowUp(userId: string, id: string): Promise<void> 
   await writeAll(userId, list.filter((f) => f.id !== id));
 }
 
-// IDs of follow-ups whose reminder is actually scheduled on this device right now.
+export async function removeAllFollowUps(userId: string): Promise<void> {
+  const list = await readAll(userId);
+  await Promise.all(list.map((f) => cancelReminder(reminderIdFor(userId, f.id))));
+  await removeLocalData('followups', userId);
+}
+
 export async function getActiveReminderIds(userId: string): Promise<Set<string>> {
   const prefix = reminderIdFor(userId, '');
   const scheduled = await getScheduledReminders();
@@ -147,8 +137,6 @@ export async function getActiveReminderIds(userId: string): Promise<Set<string>>
   );
 }
 
-// Logout clears reminders from the device; this puts back any that should still exist.
-// Never prompts — if permission isn't granted it quietly does nothing.
 export async function restoreFollowUpReminders(userId: string): Promise<void> {
   const [list, active] = await Promise.all([readAll(userId), getActiveReminderIds(userId)]);
   await Promise.all(list.filter((f) => !active.has(f.id)).map((f) => syncReminder(userId, f, false)));

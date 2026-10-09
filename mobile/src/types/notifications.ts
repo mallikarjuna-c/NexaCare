@@ -9,7 +9,6 @@ export type AppNotification = {
   category: NotificationCategory;
 };
 
-// 'unsupported' = emulator/simulator, which can't receive notifications.
 export type NotificationPermissionState = 'granted' | 'undetermined' | 'denied' | 'unsupported';
 
 export type ReminderKey = 'health_checkin' | 'challenge_progress';
@@ -20,11 +19,10 @@ export type ReminderDefinition = {
   description: string;
   notificationTitle: string;
   notificationBody: string;
-  hour: number; // 24h clock
+  hour: number;
   minute: number;
 };
 
-// Single source of truth for reminder copy and times — the screen reads its labels from here too.
 export const REMINDERS: ReminderDefinition[] = [
   {
     key: 'health_checkin',

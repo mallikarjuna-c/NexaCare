@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
 import { FOLLOW_UP_BADGES } from '../components/FollowUpCard';
 import { openExternal } from '../components/ProviderRow';
 import {
@@ -41,6 +42,9 @@ function reminderDescription(f: FollowUp, hasReminder: boolean): string {
 export default function FollowUpDetailScreen({ navigation, route }: Props) {
   const { followUpId } = route.params;
   const { user } = useAuth();
+  const { activeProfile } = useFamily();
+  const profileId = activeProfile?.id;
+  const canEdit = activeProfile?.canEdit ?? true;
   const [followUp, setFollowUp] = useState<FollowUp | null>(null);
   const [hasReminder, setHasReminder] = useState(false);
   const [linkedProvider, setLinkedProvider] = useState<Provider | null>(null);
@@ -48,28 +52,26 @@ export default function FollowUpDetailScreen({ navigation, route }: Props) {
   const [isBusy, setIsBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user || !profileId) return;
     try {
-      const [item, active] = await Promise.all([getFollowUpById(user.id, followUpId), getActiveReminderIds(user.id)]);
+      const [item, active] = await Promise.all([getFollowUpById(profileId, followUpId), getActiveReminderIds(profileId)]);
       setFollowUp(item);
       setHasReminder(active.has(followUpId));
-      // The provider may have been removed since — then we just show the saved name.
       setLinkedProvider(item?.providerId ? await getProviderById(user.id, item.providerId) : null);
     } catch {
       setFollowUp(null);
     } finally {
       setIsLoading(false);
     }
-  }, [user, followUpId]);
+  }, [user, profileId, followUpId]);
 
-  // Refresh after returning from the edit screen.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const changeStatus = async (status: FollowUpStatus) => {
-    if (!user || isBusy) return;
+    if (!profileId || isBusy) return;
     setIsBusy(true);
     try {
-      await setFollowUpStatus(user.id, followUpId, status);
+      await setFollowUpStatus(profileId, followUpId, status);
       await load();
     } catch {
       Alert.alert('Something went wrong', "We couldn't update this follow-up. Please try again.");
@@ -91,10 +93,10 @@ export default function FollowUpDetailScreen({ navigation, route }: Props) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          if (!user) return;
+          if (!profileId) return;
           setIsBusy(true);
           try {
-            await deleteFollowUp(user.id, followUpId);
+            await deleteFollowUp(profileId, followUpId);
             navigation.goBack();
           } catch {
             setIsBusy(false);
@@ -229,7 +231,7 @@ export default function FollowUpDetailScreen({ navigation, route }: Props) {
         </View>
       ) : null}
 
-      {isScheduled ? (
+      {!canEdit ? null : isScheduled ? (
         <Pressable
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, isBusy && styles.ctaDisabled]}
           onPress={() => changeStatus('completed')}
@@ -255,31 +257,35 @@ export default function FollowUpDetailScreen({ navigation, route }: Props) {
         </Pressable>
       )}
 
-      <View style={styles.actionsRow}>
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-          onPress={() => navigation.navigate('AddFollowUp', { followUpId })}
-          disabled={isBusy}
-        >
-          <Ionicons name="create-outline" size={18} color={colors.green} />
-          <Text style={styles.secondaryText}>Edit</Text>
-        </Pressable>
-        {isScheduled && (
-          <Pressable
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            onPress={confirmCancel}
-            disabled={isBusy}
-          >
-            <Ionicons name="close-circle-outline" size={18} color={colors.textSecondary} />
-            <Text style={[styles.secondaryText, styles.mutedText]}>Cancel</Text>
-          </Pressable>
-        )}
-      </View>
+      {canEdit && (
+        <>
+          <View style={styles.actionsRow}>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              onPress={() => navigation.navigate('AddFollowUp', { followUpId })}
+              disabled={isBusy}
+            >
+              <Ionicons name="create-outline" size={18} color={colors.green} />
+              <Text style={styles.secondaryText}>Edit</Text>
+            </Pressable>
+            {isScheduled && (
+              <Pressable
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                onPress={confirmCancel}
+                disabled={isBusy}
+              >
+                <Ionicons name="close-circle-outline" size={18} color={colors.textSecondary} />
+                <Text style={[styles.secondaryText, styles.mutedText]}>Cancel</Text>
+              </Pressable>
+            )}
+          </View>
 
-      <Pressable style={styles.deleteButton} onPress={confirmDelete} disabled={isBusy} hitSlop={8}>
-        <Ionicons name="trash-outline" size={16} color={colors.danger} />
-        <Text style={styles.deleteText}>Delete follow-up</Text>
-      </Pressable>
+          <Pressable style={styles.deleteButton} onPress={confirmDelete} disabled={isBusy} hitSlop={8}>
+            <Ionicons name="trash-outline" size={16} color={colors.danger} />
+            <Text style={styles.deleteText}>Delete follow-up</Text>
+          </Pressable>
+        </>
+      )}
     </ScrollView>
   );
 }

@@ -1,3 +1,6 @@
+import { formatCalendarDate } from './followUps';
+import { parseLocalISODate } from './expenses';
+
 export type HealthRecordType =
   | 'blood_pressure'
   | 'heart_rate'
@@ -11,12 +14,12 @@ export type AttachmentType = 'pdf' | 'image';
 export type HealthRecord = {
   id: string;
   type: HealthRecordType;
-  value: string;        // acts as "Title" for medical_report / prescription
+  value: string;
   date: string;
   notes?: string;
-  providerName?: string;       // doctor/lab/pharmacy name — only meaningful for document types
-  attachmentUri?: string;      // local file URI
-  attachmentName?: string;     // original file name, for display
+  providerName?: string;
+  attachmentUri?: string;
+  attachmentName?: string;
   attachmentType?: AttachmentType;
   createdAt: string;
 };
@@ -42,3 +45,9 @@ export const RECORD_TYPE_LABELS: Record<HealthRecordType, string> = {
 };
 
 export const DOCUMENT_TYPES: HealthRecordType[] = ['medical_report', 'prescription'];
+
+export const WATCH_TRACKED_TYPES: HealthRecordType[] = ['heart_rate', 'blood_pressure'];
+
+export function formatRecordDate(date: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? formatCalendarDate(parseLocalISODate(date)) : date;
+}

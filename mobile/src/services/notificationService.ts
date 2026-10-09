@@ -11,8 +11,6 @@ import {
 
 const ANDROID_CHANNEL_ID = 'reminders';
 
-// Identifiers used before reminders were scoped per user. Cancelled when seen so they
-// can't keep firing for whichever account happens to be signed in.
 const LEGACY_REMINDER_IDS = ['health-records-daily', 'challenge-daily'];
 
 Notifications.setNotificationHandler({
@@ -26,8 +24,6 @@ Notifications.setNotificationHandler({
 
 let channelReady: Promise<void> | null = null;
 
-// Android 13+ only shows the permission prompt once a channel exists, so this runs
-// before any permission request or schedule call. Safe to call repeatedly.
 function ensureAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android') return Promise.resolve();
   if (!channelReady) {
@@ -51,8 +47,6 @@ function toPermissionState(response: Notifications.NotificationPermissionsStatus
   return 'undetermined';
 }
 
-// Scheduled notifications belong to the device, not the account, so every identifier
-// carries the user ID. That keeps one user's reminders out of another user's view.
 export function userScopedId(userId: string, suffix: string): string {
   return `nexacare_${userId}_${suffix}`;
 }
@@ -80,7 +74,7 @@ export async function scheduleDailyReminder(
   minute: number
 ): Promise<string> {
   await ensureAndroidChannel();
-  await cancelReminder(identifier); // replace, never duplicate
+  await cancelReminder(identifier);
   return Notifications.scheduleNotificationAsync({
     identifier,
     content: { title, body },
@@ -93,7 +87,6 @@ export async function scheduleDailyReminder(
   });
 }
 
-// One-off reminder at an exact date/time (used by the Follow-up Tracker next).
 export async function scheduleReminderAt(identifier: string, title: string, body: string, date: Date): Promise<string> {
   if (date.getTime() <= Date.now()) {
     throw new Error('Reminder time must be in the future.');
@@ -128,7 +121,6 @@ export async function cancelReminder(identifier: string): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(identifier);
   } catch {
-    // Nothing scheduled under this identifier — already in the state we want.
   }
 }
 
@@ -136,7 +128,6 @@ export async function getScheduledReminders() {
   return Notifications.getAllScheduledNotificationsAsync();
 }
 
-// Reads what is actually scheduled on the device, so the UI can never drift from reality.
 export async function getReminderStatus(userId: string): Promise<ReminderStatus> {
   const scheduled = await getScheduledReminders();
   const ids = new Set(scheduled.map((request) => request.identifier));
@@ -153,7 +144,6 @@ export async function getReminderStatus(userId: string): Promise<ReminderStatus>
 export async function setReminderEnabled(userId: string, key: ReminderKey, enabled: boolean): Promise<SetReminderResult> {
   const identifier = userScopedId(userId, key);
 
-  // Turning a reminder off never needs permission.
   if (!enabled) {
     await cancelReminder(identifier);
     return { ok: true };
@@ -169,7 +159,6 @@ export async function setReminderEnabled(userId: string, key: ReminderKey, enabl
   return { ok: true };
 }
 
-// Called on logout so a signed-out user's reminders don't fire for the next person.
 export async function cancelAllRemindersForUser(userId: string): Promise<void> {
   const prefix = userScopedId(userId, '');
   const scheduled = await getScheduledReminders();

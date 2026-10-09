@@ -2,8 +2,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { parseMessage, type InlinePart } from '../types/messageFormat';
 import { colors, spacing } from '../theme/theme';
 
-// Renders an assistant reply with real bold text, bullets, numbered lists and headings.
-
 function Inline({ parts }: { parts: InlinePart[] }) {
   return (
     <>

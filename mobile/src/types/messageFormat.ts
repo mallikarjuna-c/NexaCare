@@ -1,6 +1,3 @@
-// Turns the assistant's light Markdown (bold, bullets, numbered lists, headings, simple tables)
-// into blocks the chat can render — so replies never show raw "**" or "|" characters.
-
 export type InlinePart = { text: string; bold?: boolean; italic?: boolean; code?: boolean };
 
 export type MessageBlock =
@@ -39,7 +36,6 @@ export function parseMessage(text: string): MessageBlock[] {
     if (blocks.length && blocks[blocks.length - 1].kind !== 'gap') blocks.push({ kind: 'gap' });
   };
 
-  // The AI sometimes uses no-break spaces/hyphens that some Android fonts draw as boxes.
   const clean = text
     .replace(/\r\n/g, '\n')
     .replace(/[   ]/g, ' ')
@@ -61,7 +57,6 @@ export function parseMessage(text: string): MessageBlock[] {
       continue;
     }
 
-    // Tables: first row is the header; each later row becomes "Header: value · Header: value".
     if (line.startsWith('|')) {
       if (isTableDivider(line)) continue;
       const cells = line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());

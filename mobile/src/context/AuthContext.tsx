@@ -3,6 +3,9 @@ import * as authService from '../services/authService';
 import { cancelAllRemindersForUser } from '../services/notificationService';
 import { restoreFollowUpReminders } from '../services/followUpService';
 import { removeFaceScanData } from '../services/legacyDataService';
+import { getFamilyMembers } from '../services/familyService';
+import { setSessionUser } from '../services/profileStore';
+import { getMedicalInfo } from '../services/emergencyService';
 import type { User, AuthContextType } from '../types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -11,38 +14,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const applyUser = (next: User | null) => {
+    setSessionUser(next?.id ?? null);
+    setUser(next);
+  };
+
   useEffect(() => {
     authService.getCurrentUser().then((storedUser) => {
-      setUser(storedUser);
+      applyUser(storedUser);
       setIsLoading(false);
     });
   }, []);
 
-  // Logout clears this user's reminders from the device; put follow-up reminders back when they sign in.
   const userId = user?.id;
   useEffect(() => {
     if (!userId) return;
-    restoreFollowUpReminders(userId).catch((e) => console.warn('Could not restore follow-up reminders', e));
-    removeFaceScanData(userId).catch(() => {}); // harmless if there's nothing to remove
+    getFamilyMembers(userId)
+      .catch(() => [])
+      .then((members) => Promise.all([userId, ...members.map((m) => m.id)].map(restoreFollowUpReminders)))
+      .catch((e) => console.warn('Could not restore follow-up reminders', e));
+    removeFaceScanData(userId).catch(() => {});
+    getMedicalInfo(userId).catch(() => {});
   }, [userId]);
 
   const login = async (email: string, password: string) => {
     const loggedInUser = await authService.login(email, password);
-    setUser(loggedInUser);
+    applyUser(loggedInUser);
   };
 
   const signup = async (name: string, email: string, password: string) => {
     const newUser = await authService.signup(name, email, password);
-    setUser(newUser);
+    applyUser(newUser);
   };
 
   const logout = async () => {
     if (user) {
-      // Scheduled notifications live on the device, not the account — clear this user's before signing out.
       await cancelAllRemindersForUser(user.id).catch((e) => console.warn('Could not cancel reminders on logout', e));
     }
     await authService.logout();
-    setUser(null);
+    applyUser(null);
   };
 
   return (

@@ -27,7 +27,7 @@ export default function ChallengeDetailScreen({ route }: Props) {
     const c = await getChallengeById(challengeId);
     if (!c) { setIsLoading(false); return; }
 
-    await joinChallenge(user.id, challengeId); // no-op if already joined
+    await joinChallenge(user.id, challengeId);
     const [p, lb] = await Promise.all([getProgress(user.id, challengeId), getLeaderboard(user.id, c)]);
 
     setChallenge(c);

@@ -14,7 +14,6 @@ export const PROVIDER_BADGES: Record<ProviderType, { icon: keyof typeof Ionicons
   other: { icon: 'location-outline', bg: colors.background, tint: colors.textSecondary },
 };
 
-// Shared by the list row and the detail screen.
 export async function openExternal(url: string, failureMessage: string) {
   try {
     await Linking.openURL(url);

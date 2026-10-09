@@ -1,22 +1,21 @@
-"""NexaCare backend: the Health Assistant endpoint.
-
-The Groq API key lives only on this server (backend/.env). The mobile app never sees it;
-it just sends the conversation here.
-"""
-
 import logging
 import os
 from typing import Literal
 
 import groq
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator
+
+from auth import current_user, router as auth_router
+from data import router as data_router
+from links import router as links_router
+from db import User, init_db
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nexacare")
 
 MODEL = os.environ.get("GROQ_MODEL", "").strip() or "openai/gpt-oss-120b"
-MAX_HISTORY = 20  # most recent messages sent to the AI; older ones stay on the phone
+MAX_HISTORY = 20
 
 SYSTEM_PROMPT = """You are the Health Assistant inside NexaCare, a personal health app used mainly in India. People ask you about symptoms, readings from their smartwatch or lab reports, medicines, everyday wellbeing, and how to look after their health.
 
@@ -51,17 +50,20 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
-    refused: bool = False  # kept for the app's API shape; Groq has no separate refusal signal
+    refused: bool = False
 
 
+init_db()
 app = FastAPI(title="NexaCare API")
+app.include_router(auth_router)
+app.include_router(data_router)
+app.include_router(links_router)
 
 
 def api_key() -> str:
     return os.environ.get("GROQ_API_KEY", "").strip()
 
 
-# Created lazily so the server still starts (and /health works) before a key is added.
 _client: groq.AsyncGroq | None = None
 
 
@@ -78,11 +80,10 @@ async def health() -> dict:
 
 
 @app.post("/assistant/chat", response_model=ChatResponse)
-async def chat(body: ChatRequest) -> ChatResponse:
+async def chat(body: ChatRequest, _user: User = Depends(current_user)) -> ChatResponse:
     if not api_key():
         raise HTTPException(503, "The assistant isn't set up yet: add GROQ_API_KEY to backend/.env.")
 
-    # Keep the latest messages, and make sure the history still starts with the user.
     turns = body.messages[-MAX_HISTORY:]
     while turns and turns[0].role != "user":
         turns = turns[1:]
@@ -100,7 +101,6 @@ async def chat(body: ChatRequest) -> ChatResponse:
             messages=[{"role": "system", "content": system}, *[t.model_dump() for t in turns]],
             max_completion_tokens=2000,
             temperature=0.4,
-            # gpt-oss models think before answering: keep it light, and leave the thinking out of the reply.
             **({"reasoning_effort": "low", "include_reasoning": False} if MODEL.startswith("openai/gpt-oss") else {}),
         )
     except (groq.AuthenticationError, groq.PermissionDeniedError):

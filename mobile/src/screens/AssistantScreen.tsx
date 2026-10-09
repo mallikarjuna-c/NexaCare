@@ -37,7 +37,6 @@ function dayLabel(iso: string): string {
   return formatCalendarDate(d);
 }
 
-// Three dots that pulse one after another while the assistant is answering.
 function TypingDots() {
   const dots = useRef([0, 1, 2].map(() => new Animated.Value(0.3))).current;
   useEffect(() => {
@@ -85,7 +84,6 @@ export default function AssistantScreen({ navigation }: Props) {
   const [errorText, setErrorText] = useState<string | null>(null);
   const [showEmergency, setShowEmergency] = useState(false);
 
-  // The conversation only changes on this screen, so loading once per user is enough.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -240,7 +238,6 @@ export default function AssistantScreen({ navigation }: Props) {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerRow}>
           <AssistantAvatar size={42} />
@@ -336,7 +333,6 @@ export default function AssistantScreen({ navigation }: Props) {
         />
       )}
 
-      {/* Emergency banner — shown immediately when a message sounds like an emergency */}
       {showEmergency && (
         <View style={styles.emergency}>
           <View style={styles.emergencyTop}>
@@ -364,7 +360,6 @@ export default function AssistantScreen({ navigation }: Props) {
         </View>
       )}
 
-      {/* Composer */}
       <View style={styles.composer}>
         <View style={styles.inputWrap}>
           <TextInput
@@ -401,7 +396,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Header
   header: {
     paddingHorizontal: spacing.lg, paddingBottom: spacing.md,
     backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -426,7 +420,6 @@ const styles = StyleSheet.create({
   miniKnob: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF' },
   miniKnobOn: { alignSelf: 'flex-end' },
 
-  // List
   listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.md },
   listEmpty: { flexGrow: 1, justifyContent: 'center' },
 
@@ -461,7 +454,6 @@ const styles = StyleSheet.create({
   failedText: { flexShrink: 1, fontSize: 12, color: colors.danger, textAlign: 'right' },
   retryText: { fontWeight: '800', textDecorationLine: 'underline' },
 
-  // Empty state
   empty: { alignItems: 'center', paddingHorizontal: spacing.sm },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' },
   emptyText: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs, lineHeight: 19 },
@@ -476,7 +468,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.sm },
   cardText: { fontSize: 12, color: colors.textSecondary, marginTop: 2, lineHeight: 17 },
 
-  // Emergency
   emergency: {
     marginHorizontal: spacing.md, marginBottom: spacing.sm, padding: spacing.md,
     backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.danger,
@@ -494,7 +485,6 @@ const styles = StyleSheet.create({
   sosButton: { borderWidth: 1, borderColor: colors.danger },
   sosText: { fontSize: 14, fontWeight: '800', color: colors.danger },
 
-  // Composer
   composer: {
     paddingHorizontal: spacing.md, paddingTop: spacing.sm,
     backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border,

@@ -1,18 +1,16 @@
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { MainTabParamList } from '../navigation/MainTabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
 import LeafAccent from '../components/LeafAccent';
 import { colors, typography, spacing } from '../theme/theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
-  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-  // Screens like Share Health Data live in the Home tab's stack; initial:false keeps Home underneath for Back.
-  const openInHome = (screen: 'ShareHealthData' | 'Emergency') =>
-    navigation.navigate('HomeTab', { screen, initial: false });
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const openInHome = (screen: 'ShareHealthData' | 'Emergency') => navigation.navigate(screen);
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
     : '?';
@@ -33,7 +31,7 @@ export default function ProfileScreen() {
         <LeafAccent size={190} color={colors.blueLight} rotation={165} opacity={0.12} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
@@ -86,14 +84,14 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={20} color={colors.danger} />
           <Text style={styles.logoutText}>Log Out</Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background, position: 'relative', overflow: 'hidden' },
-  content: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
+  content: { alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
 
   avatar: {
     width: 88,

@@ -13,12 +13,10 @@ type Props = {
   userId: string;
   value: ProviderSelection;
   onChange: (value: ProviderSelection) => void;
-  onPick?: (provider: Provider) => void; // lets the form infer type/category from the chosen provider
+  onPick?: (provider: Provider) => void;
   placeholder: string;
 };
 
-// A name field that can be linked to a saved provider. Typing by hand always works;
-// picking from the directory links the item so the provider's phone/location can be used later.
 export default function ProviderPicker({ userId, value, onChange, onPick, placeholder }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -59,7 +57,6 @@ export default function ProviderPicker({ userId, value, onChange, onPick, placeh
           placeholder={placeholder}
           placeholderTextColor={colors.textSecondary}
           value={value.providerName}
-          // Editing the name by hand unlinks it — the text no longer describes the saved provider.
           onChangeText={(text) => onChange({ providerId: undefined, providerName: text })}
         />
         <Pressable

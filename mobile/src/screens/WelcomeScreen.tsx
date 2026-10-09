@@ -16,7 +16,7 @@ const FEATURES = [
 
 export default function WelcomeScreen({ navigation }: Props) {
   const goToLogin = () => navigation.navigate('Login');
-  const insets = useSafeAreaInsets(); // keeps the footer clear of Android's navigation buttons
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.screen}>

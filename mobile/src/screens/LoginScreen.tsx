@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
+import ServerSettings from '../components/ServerSettings';
 import LeafAccent from '../components/LeafAccent';
 import { colors, typography, spacing } from '../theme/theme';
 
@@ -108,6 +109,7 @@ export default function LoginScreen({ navigation }: Props) {
               <Text style={styles.footerLink}>Sign Up</Text>
             </Pressable>
           </View>
+          <ServerSettings />
         </View>
       </KeyboardAvoidingView>
     </View>
