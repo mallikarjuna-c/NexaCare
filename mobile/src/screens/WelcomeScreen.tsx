@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable, ScrollView, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../navigation/AppNavigator';
 import { colors, typography, spacing } from '../theme/theme';
@@ -15,6 +16,7 @@ const FEATURES = [
 
 export default function WelcomeScreen({ navigation }: Props) {
   const goToLogin = () => navigation.navigate('Login');
+  const insets = useSafeAreaInsets(); // keeps the footer clear of Android's navigation buttons
 
   return (
     <View style={styles.screen}>
@@ -23,7 +25,11 @@ export default function WelcomeScreen({ navigation }: Props) {
       <View style={[styles.blob, styles.blobBottomLeft]} />
       <View style={[styles.blob, styles.blobBottomRight]} />
 
-      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Image
           source={require('../../assets/branding/logo.png')}
           style={styles.logo}
@@ -75,16 +81,16 @@ const styles = StyleSheet.create({
   scrollArea: { flex: 1, backgroundColor: 'transparent' },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: 60,
+    paddingTop: 80,
     paddingBottom: spacing.xl,
     alignItems: 'center',
     minHeight: '100%',
   },
 
   logo: {
-    width: 120,
-    height: 60,
-    marginBottom: spacing.md,
+    width: 140,
+    height: 70,
+    marginBottom: spacing.lg,
     alignSelf: 'center',
   },
 

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SOS app-shortcut icon: danger-red circle (#C0392B, theme "danger") with a white "!" mark.
+     Copied into android/app/src/main/res/drawable by plugins/withSosShortcutIcon.js during prebuild. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#C0392B"
+        android:pathData="M24,2a22,22 0,1 1,0 44a22,22 0,1 1,0 -44z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21.5,12h5a1,1 0,0 1,1 1l-1,16a1.5,1.5 0,0 1,-1.5 1.4h-2a1.5,1.5 0,0 1,-1.5 -1.4l-1,-16a1,1 0,0 1,1 -1z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,33.5a2.75,2.75 0,1 1,0 5.5a2.75,2.75 0,1 1,0 -5.5z" />
+</vector>

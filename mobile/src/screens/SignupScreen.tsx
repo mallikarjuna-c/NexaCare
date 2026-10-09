@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +12,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 
 export default function SignupScreen({ navigation }: Props) {
   const { signup } = useAuth();
+  const insets = useSafeAreaInsets(); // keeps the bottom link clear of Android's navigation buttons
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -62,7 +64,7 @@ export default function SignupScreen({ navigation }: Props) {
       >
         <ScrollView 
           style={styles.flex} 
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.xl + insets.bottom }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -173,7 +175,12 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: spacing.xl },
   content: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg },
 
-  logo: { width: 110, height: 55, alignSelf: 'center', marginBottom: spacing.lg },
+  logo: { 
+    width: 130, 
+    height: 65, 
+    alignSelf: 'center', 
+    marginBottom: spacing.xl 
+  },
 
   headline: { textAlign: 'center' },
   subtitle: { textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.xl },

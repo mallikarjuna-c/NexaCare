@@ -8,14 +8,16 @@ import type { HomeStackParamList } from '../navigation/HomeStack';
 import { useAuth } from '../context/AuthContext';
 import { addRecord } from '../services/healthRecordsService';
 import { RECORD_TYPE_LABELS, DOCUMENT_TYPES, type HealthRecordType, type AttachmentType } from '../types/healthRecords';
+import { toLocalISODate } from '../types/expenses';
 import { colors, typography, spacing } from '../theme/theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'AddRecord'>;
 
 const TYPE_OPTIONS = Object.keys(RECORD_TYPE_LABELS) as HealthRecordType[];
 
+// Local date — toISOString() is UTC, which is still "yesterday" before 5:30 AM in India.
 function todayISO() {
-  return new Date().toISOString().split('T')[0];
+  return toLocalISODate(new Date());
 }
 
 export default function AddRecordScreen({ navigation, route }: Props) {

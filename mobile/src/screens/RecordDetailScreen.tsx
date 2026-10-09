@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/HomeStack';
@@ -7,7 +7,7 @@ import { colors, typography, spacing } from '../theme/theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RecordDetail'>;
 
-export default function RecordDetailScreen({ route }: Props) {
+export default function RecordDetailScreen({ navigation, route }: Props) {
   const { record } = route.params;
 
   return (
@@ -46,6 +46,14 @@ export default function RecordDetailScreen({ route }: Props) {
           <Text style={styles.notesText}>{record.notes}</Text>
         </View>
       ) : null}
+
+      <Pressable
+        style={({ pressed }) => [styles.shareButton, pressed && { opacity: 0.7 }]}
+        onPress={() => navigation.navigate('ShareHealthData', { recordIds: [record.id] })}
+      >
+        <Ionicons name="share-outline" size={18} color={colors.green} />
+        <Text style={styles.shareButtonText}>Share this record</Text>
+      </Pressable>
     </View>
   );
 }
@@ -74,4 +82,10 @@ const styles = StyleSheet.create({
   },
   notesLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: spacing.xs },
   notesText: { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
+  shareButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, alignSelf: 'stretch',
+    borderWidth: 1, borderColor: colors.green, borderRadius: 30, paddingVertical: 12, marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+  },
+  shareButtonText: { fontSize: 14, fontWeight: '700', color: colors.green },
 });

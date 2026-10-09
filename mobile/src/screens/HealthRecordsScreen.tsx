@@ -47,10 +47,18 @@ export default function HealthRecordsScreen({ navigation }: Props) {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <Text style={styles.sectionLabel}>Categories</Text>
-        <Pressable style={styles.addButton} onPress={() => navigation.navigate('AddRecord')}>
-          <Ionicons name="add" size={18} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Add Record</Text>
-        </Pressable>
+        <View style={styles.headerButtons}>
+          {records.length > 0 && (
+            <Pressable style={styles.shareButton} onPress={() => navigation.navigate('ShareHealthData')}>
+              <Ionicons name="share-outline" size={16} color={colors.green} />
+              <Text style={styles.shareButtonText}>Share</Text>
+            </Pressable>
+          )}
+          <Pressable style={styles.addButton} onPress={() => navigation.navigate('AddRecord')}>
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Add Record</Text>
+          </Pressable>
+        </View>
       </View>
       <View style={styles.grid}>
         {CATEGORIES.map((c) => (
@@ -104,6 +112,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green, paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: 20,
   },
   addButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  shareButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderColor: colors.green, backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 20,
+  },
+  shareButtonText: { color: colors.green, fontSize: 13, fontWeight: '700' },
   sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.xl },
