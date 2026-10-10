@@ -40,7 +40,6 @@ export default function SignupScreen({ navigation }: Props) {
     setIsSubmitting(true);
     try {
       await signup(name, email, password);
-      // AppNavigator switches to the Main stack automatically once `user` is set.
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Signup failed.';
       Alert.alert('Signup failed', message);

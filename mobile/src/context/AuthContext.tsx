@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { Alert } from 'react-native';
 import * as authService from '../services/authService';
+import { setSessionExpiredHandler, wakeServer } from '../services/apiClient';
 import { cancelAllRemindersForUser } from '../services/notificationService';
 import { restoreFollowUpReminders } from '../services/followUpService';
 import { removeFaceScanData } from '../services/legacyDataService';
@@ -22,10 +24,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    wakeServer();
     authService.getCurrentUser().then((storedUser) => {
       applyUser(storedUser);
       setIsLoading(false);
     });
+  }, []);
+
+  const expiringRef = useRef(false);
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      if (expiringRef.current) return;
+      expiringRef.current = true;
+      authService
+        .logout()
+        .then(() => {
+          applyUser(null);
+          Alert.alert('Session expired', 'Please log in again to continue.');
+        })
+        .finally(() => {
+          expiringRef.current = false;
+        });
+    });
+    return () => setSessionExpiredHandler(null);
   }, []);
 
   const userId = user?.id;

@@ -3,7 +3,8 @@ import os
 from typing import Literal
 
 import groq
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from auth import current_user, router as auth_router
@@ -11,6 +12,7 @@ from data import router as data_router
 from links import router as links_router
 from community import router as community_router
 from db import User, init_db
+from ratelimit import RateLimiter
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nexacare")
@@ -54,8 +56,27 @@ class ChatResponse(BaseModel):
     refused: bool = False
 
 
+MAX_BODY_BYTES = 6_000_000
+SHOW_DOCS = not os.environ.get("RENDER")
+
 init_db()
-app = FastAPI(title="NexaCare API")
+app = FastAPI(
+    title="NexaCare API",
+    docs_url="/docs" if SHOW_DOCS else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if SHOW_DOCS else None,
+)
+assistant_limit = RateLimiter(40, 60 * 60, "You've sent a lot of messages. Please wait a while and try again.")
+
+
+@app.middleware("http")
+async def limit_body_size(request: Request, call_next):
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > MAX_BODY_BYTES:
+        return JSONResponse({"detail": "This is too much data to send at once."}, status_code=413)
+    return await call_next(request)
+
+
 app.include_router(auth_router)
 app.include_router(data_router)
 app.include_router(links_router)
@@ -82,9 +103,11 @@ async def health() -> dict:
 
 
 @app.post("/assistant/chat", response_model=ChatResponse)
-async def chat(body: ChatRequest, _user: User = Depends(current_user)) -> ChatResponse:
+async def chat(body: ChatRequest, user: User = Depends(current_user)) -> ChatResponse:
     if not api_key():
-        raise HTTPException(503, "The assistant isn't set up yet: add GROQ_API_KEY to backend/.env.")
+        raise HTTPException(503, "The assistant isn't available right now. Please try again later.")
+    assistant_limit.check(user.id)
+    assistant_limit.hit(user.id)
 
     turns = body.messages[-MAX_HISTORY:]
     while turns and turns[0].role != "user":
@@ -107,7 +130,7 @@ async def chat(body: ChatRequest, _user: User = Depends(current_user)) -> ChatRe
         )
     except (groq.AuthenticationError, groq.PermissionDeniedError):
         log.error("Groq rejected the API key")
-        raise HTTPException(503, "The assistant's API key isn't valid. Check backend/.env.")
+        raise HTTPException(503, "The assistant isn't available right now. Please try again later.")
     except groq.RateLimitError:
         raise HTTPException(429, "The free AI limit was reached for now. Try again in a minute.")
     except groq.BadRequestError as e:
@@ -117,7 +140,7 @@ async def chat(body: ChatRequest, _user: User = Depends(current_user)) -> ChatRe
         log.error("Groq error %s", e.status_code)
         raise HTTPException(503, "The AI service is busy right now. Try again shortly.")
     except groq.APIConnectionError:
-        raise HTTPException(504, "The server couldn't reach the AI service. Check the PC's internet connection.")
+        raise HTTPException(504, "The server couldn't reach the AI service. Please try again shortly.")
 
     choice = completion.choices[0]
     reply = (choice.message.content or "").strip()

@@ -210,7 +210,7 @@ def put_donor(body: DonorIn, user: User = Depends(current_user), db: Session = D
         raise HTTPException(422, "Choose your blood group to register as a donor.")
     if body.willing and not PHONE_RE.match(body.phone.strip()):
         raise HTTPException(422, "Add a phone number so requesters can reach you.")
-    if body.last_donation and body.last_donation > date.today():
+    if body.last_donation and body.last_donation > date.today() + timedelta(days=1):
         raise HTTPException(422, "The last donation date can't be in the future.")
     profile = db.get(DonorProfile, user.id) or DonorProfile(user_id=user.id)
     profile.city = normalize_city(body.city)

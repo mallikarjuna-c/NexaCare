@@ -3,9 +3,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const DEFAULT_API_URL: string = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8010';
 const TOKEN_KEY = 'nexacare_auth_token';
 const API_URL_KEY = 'nexacare_api_url';
-const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 let apiUrl: string | null = null;
+let onSessionExpired: (() => void) | null = null;
+
+export function setSessionExpiredHandler(handler: (() => void) | null): void {
+  onSessionExpired = handler;
+}
+
+export function wakeServer(): void {
+  getApiUrl()
+    .then((url) => fetch(`${url}/health`))
+    .catch(() => {});
+}
 
 export async function getApiUrl(): Promise<string> {
   if (apiUrl) return apiUrl;
@@ -64,10 +75,8 @@ type RequestOptions = {
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, auth = true, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (auth) {
-    const token = await getAuthToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+  const token = auth ? await getAuthToken() : null;
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -83,7 +92,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiError(
       controller.signal.aborted
         ? 'The server took too long to answer. Please try again.'
-        : "Can't reach the NexaCare server. Make sure it's running and your phone is connected.",
+        : "Can't reach NexaCare. Check your internet connection and try again.",
       0
     );
   } finally {
@@ -91,6 +100,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   const data: unknown = await response.json().catch(() => null);
+  if (response.status === 401 && token) onSessionExpired?.();
   if (!response.ok) {
     throw new ApiError(messageFrom(data) ?? 'Something went wrong. Please try again.', response.status);
   }
