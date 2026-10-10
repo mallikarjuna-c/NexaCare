@@ -2,7 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiError, apiRequest } from './apiClient';
 import { isMemberProfileId } from '../types/family';
 
-export type DataCollection = 'records' | 'followups' | 'expenses' | 'medical' | 'watch';
+export type DataCollection =
+  | 'records'
+  | 'followups'
+  | 'expenses'
+  | 'medical'
+  | 'watch'
+  | 'reminders'
+  | 'reminder_logs'
+  | 'challenges';
 export type ProfileAccess = 'owner' | 'edit' | 'view' | 'local';
 
 const LOCAL_PREFIX: Record<DataCollection, string> = {
@@ -11,6 +19,9 @@ const LOCAL_PREFIX: Record<DataCollection, string> = {
   expenses: 'nexacare_expenses_',
   medical: 'nexacare_medical_info_',
   watch: 'nexacare_watch_summary_',
+  reminders: 'nexacare_reminders_',
+  reminder_logs: 'nexacare_reminder_logs_',
+  challenges: 'nexacare_challenges_',
 };
 
 let sessionUserId: string | null = null;

@@ -1,22 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AppNotification, NotificationCategory } from '../types/notifications';
+import type { AppNotification, NotificationCategory, NotificationRoute } from '../types/notifications';
 
 const KEY_PREFIX = 'nexacare_notifications_';
 const MAX_ITEMS = 100;
 
-function keyFor(userId: string) {
-  return `${KEY_PREFIX}${userId}`;
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+export function subscribeToNotifications(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
-function welcomeNotification(): AppNotification {
-  return {
-    id: 'welcome',
-    title: 'Welcome to NexaCare',
-    body: 'Track your health records, join community challenges and set reminders — all in one place.',
-    createdAt: new Date().toISOString(),
-    read: false,
-    category: 'announcement',
-  };
+function notifyChanged() {
+  listeners.forEach((listener) => listener());
+}
+
+function keyFor(userId: string) {
+  return `${KEY_PREFIX}${userId}`;
 }
 
 function parseStored(raw: string): AppNotification[] | null {
@@ -25,6 +28,7 @@ function parseStored(raw: string): AppNotification[] | null {
     if (!Array.isArray(parsed)) return null;
     return parsed
       .filter((n): n is AppNotification => !!n && typeof n.id === 'string' && typeof n.title === 'string')
+      .filter((n) => n.id !== 'welcome')
       .map((n) => ({ ...n, category: n.category ?? 'announcement' }));
   } catch {
     return null;
@@ -33,16 +37,12 @@ function parseStored(raw: string): AppNotification[] | null {
 
 async function save(userId: string, list: AppNotification[]): Promise<void> {
   await AsyncStorage.setItem(keyFor(userId), JSON.stringify(list.slice(0, MAX_ITEMS)));
+  notifyChanged();
 }
 
 export async function getNotifications(userId: string): Promise<AppNotification[]> {
   const raw = await AsyncStorage.getItem(keyFor(userId));
-
-  if (raw === null) {
-    const seeded = [welcomeNotification()];
-    await save(userId, seeded);
-    return seeded;
-  }
+  if (raw === null) return [];
 
   const list = parseStored(raw);
   if (list === null) {
@@ -54,20 +54,31 @@ export async function getNotifications(userId: string): Promise<AppNotification[
   return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function addNotification(
-  userId: string,
-  title: string,
-  body: string,
-  category: NotificationCategory = 'announcement'
-): Promise<AppNotification> {
+export type NewNotification = {
+  title: string;
+  body: string;
+  category?: NotificationCategory;
+  route?: NotificationRoute;
+  profileId?: string;
+  sourceId?: string;
+  createdAt?: string;
+};
+
+export async function addNotification(userId: string, input: NewNotification): Promise<AppNotification> {
   const existing = await getNotifications(userId);
+  const duplicate = input.sourceId ? existing.find((n) => n.sourceId === input.sourceId) : undefined;
+  if (duplicate) return duplicate;
+
   const created: AppNotification = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    title,
-    body,
-    createdAt: new Date().toISOString(),
+    title: input.title,
+    body: input.body,
+    createdAt: input.createdAt ?? new Date().toISOString(),
     read: false,
-    category,
+    category: input.category ?? 'announcement',
+    route: input.route,
+    profileId: input.profileId,
+    sourceId: input.sourceId,
   };
   await save(userId, [created, ...existing]);
   return created;

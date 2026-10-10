@@ -21,6 +21,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([promise, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
 }
 
+export async function getCurrentCity(): Promise<string | null> {
+  const result = await getCurrentLocation();
+  if (!result.ok) return null;
+  const [place] = await Location.reverseGeocodeAsync({
+    latitude: result.coords.latitude,
+    longitude: result.coords.longitude,
+  });
+  return place?.city || place?.subregion || place?.district || null;
+}
+
 export async function getCurrentLocation(): Promise<LocationResult> {
   const permission = await Location.requestForegroundPermissionsAsync();
   if (!permission.granted) return { ok: false, reason: 'permission_denied' };

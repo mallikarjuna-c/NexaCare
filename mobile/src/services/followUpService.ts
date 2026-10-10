@@ -50,7 +50,11 @@ async function syncReminder(userId: string, followUp: FollowUp, promptForPermiss
   const body = [followUp.title, formatAbsolute(followUp.scheduledAt), followUp.providerName].filter(Boolean).join(' · ');
 
   try {
-    await scheduleReminderAt(identifier, title, body, at);
+    await scheduleReminderAt(identifier, title, body, at, {
+      route: { screen: 'FollowUpDetail', params: { followUpId: followUp.id } },
+      profileId: userId,
+      category: 'reminder',
+    });
     return 'scheduled';
   } catch (error) {
     console.warn('Could not schedule follow-up reminder', error);
@@ -138,6 +142,11 @@ export async function getActiveReminderIds(userId: string): Promise<Set<string>>
 }
 
 export async function restoreFollowUpReminders(userId: string): Promise<void> {
-  const [list, active] = await Promise.all([readAll(userId), getActiveReminderIds(userId)]);
-  await Promise.all(list.filter((f) => !active.has(f.id)).map((f) => syncReminder(userId, f, false)));
+  const [list, scheduled] = await Promise.all([readAll(userId), getScheduledReminders()]);
+  const withRoute = new Set(
+    scheduled.filter((request) => request.content.data?.route).map((request) => request.identifier)
+  );
+  await Promise.all(
+    list.filter((f) => !withRoute.has(reminderIdFor(userId, f.id))).map((f) => syncReminder(userId, f, false))
+  );
 }

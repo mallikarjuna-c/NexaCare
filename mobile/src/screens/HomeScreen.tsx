@@ -1,13 +1,28 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { getUnreadCount } from '../services/notificationHistoryService';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { HomeStackParamList } from '../navigation/HomeStack';
+import { useAuth } from '../context/AuthContext';
+import { useFamily } from '../context/FamilyContext';
+import LeafAccent from '../components/LeafAccent';
+import MonthAnalysis from '../components/MonthAnalysis';
+import BloodAlertCard, { pickAlerts } from '../components/BloodAlertCard';
+import { listHelpRequests } from '../services/communityService';
+import type { HelpRequest } from '../types/community';
+import { getUnreadCount, subscribeToNotifications } from '../services/notificationHistoryService';
+import { getUpcomingReminders, type UpcomingReminder } from '../services/notificationService';
 import { getWatchSummary, isWatchConnected, uploadWatchSummary } from '../services/healthConnectService';
 import {
   WATCH_METRICS, formatWatchValue, timeAgo, watchMetricStatus, type Tone, type WatchSummary,
 } from '../types/smartwatch';
-import MonthAnalysis from '../components/MonthAnalysis';
+import { initialsOf } from '../types/family';
+import { formatCalendarDate } from '../types/followUps';
+import { colors, spacing } from '../theme/theme';
+
+type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
+type IconName = keyof typeof Ionicons.glyphMap;
 
 const TONE_STYLES: Record<Tone, { bg: string; fg: string }> = {
   good: { bg: colors.badge.greenBg, fg: colors.green },
@@ -15,25 +30,68 @@ const TONE_STYLES: Record<Tone, { bg: string; fg: string }> = {
   bad: { bg: '#FCE1E1', fg: colors.danger },
   info: { bg: colors.badge.blueBg, fg: colors.badge.blueIcon },
 };
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { HomeStackParamList } from '../navigation/HomeStack';
-import { useAuth } from '../context/AuthContext';
-import { useFamily } from '../context/FamilyContext';
-import LeafAccent from '../components/LeafAccent';
-import { initialsOf, possessive } from '../types/family';
-import { colors, typography, spacing } from '../theme/theme';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
+const QUICK_ACTIONS: {
+  label: string;
+  hint: string;
+  icon: IconName;
+  bg: string;
+  tint: string;
+  screen: 'HealthRecords' | 'FollowUps' | 'Reminders' | 'Expenses';
+}[] = [
+  { label: 'Health Records', hint: 'Vitals & reports', icon: 'document-text-outline', bg: colors.badge.greenBg, tint: colors.badge.greenIcon, screen: 'HealthRecords' },
+  { label: 'Follow-ups', hint: 'Appointments & tests', icon: 'calendar-outline', bg: colors.badge.purpleBg, tint: colors.badge.purpleIcon, screen: 'FollowUps' },
+  { label: 'Reminders', hint: 'Upcoming & daily', icon: 'alarm-outline', bg: colors.badge.orangeBg, tint: colors.badge.orangeIcon, screen: 'Reminders' },
+  { label: 'Expenses', hint: 'Bills & medicines', icon: 'wallet-outline', bg: colors.badge.blueBg, tint: colors.badge.blueIcon, screen: 'Expenses' },
+];
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function greetingFor(d: Date) {
+  const h = d.getHours();
+  if (h >= 5 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatLongDate(d: Date) {
+  return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+}
+
+function formatReminderTime(at: Date) {
+  const hour = at.getHours();
+  const time = `${hour % 12 || 12}:${String(at.getMinutes()).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(at).setHours(0, 0, 0, 0) - start.getTime()) / 86_400_000);
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Tomorrow, ${time}`;
+  return `${formatCalendarDate(at)}, ${time}`;
+}
 
 export default function HomeScreen({ navigation }: Props) {
   const { user } = useAuth();
+  const { activeProfile } = useFamily();
   const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const [now, setNow] = useState(() => new Date());
   const [unreadCount, setUnreadCount] = useState(0);
   const [watch, setWatch] = useState<WatchSummary | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const { activeProfile } = useFamily();
+  const [nextReminder, setNextReminder] = useState<UpcomingReminder | null>(null);
+  const [bloodAlerts, setBloodAlerts] = useState<{ matches: HelpRequest[]; mine: HelpRequest[] }>({ matches: [], mine: [] });
+
+  const loadBloodAlerts = useCallback(() => {
+    Promise.all([listHelpRequests('nearby'), listHelpRequests('mine')])
+      .then(([nearby, mine]) => {
+        const byId = new Map([...nearby, ...mine].map((r) => [r.id, r]));
+        setBloodAlerts(pickAlerts([...byId.values()]));
+      })
+      .catch(() => {});
+  }, []);
   const openWatch = () => navigation.getParent()?.navigate('Watch' as never);
   const openFamily = () => navigation.getParent()?.navigate('Family' as never);
+  const openCare = () => navigation.getParent()?.navigate('Care' as never);
 
   const latestMetrics = watch
     ? WATCH_METRICS.filter((m) => m.key !== 'steps' && m.key !== 'sleep')
@@ -50,7 +108,12 @@ export default function HomeScreen({ navigation }: Props) {
     useCallback(() => {
       if (!user) return;
       setRefreshKey((k) => k + 1);
+      setNow(new Date());
+      loadBloodAlerts();
       getUnreadCount(user.id).then(setUnreadCount).catch(() => setUnreadCount(0));
+      getUpcomingReminders(user.id)
+        .then((list) => setNextReminder(list[0] ?? null))
+        .catch(() => setNextReminder(null));
       isWatchConnected(user.id)
         .then((connected) => (connected ? getWatchSummary() : null))
         .then((summary) => {
@@ -58,8 +121,16 @@ export default function HomeScreen({ navigation }: Props) {
           if (summary) uploadWatchSummary(user.id, summary).catch(() => {});
         })
         .catch(() => setWatch(null));
-    }, [user])
+    }, [user, loadBloodAlerts])
   );
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToNotifications(() => {
+      getUnreadCount(user.id).then(setUnreadCount).catch(() => {});
+      loadBloodAlerts();
+    });
+  }, [user, loadBloodAlerts]);
 
   const viewingMember = !!activeProfile && !activeProfile.isSelf;
 
@@ -71,8 +142,19 @@ export default function HomeScreen({ navigation }: Props) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
+          <Pressable
+            style={({ pressed }) => [styles.avatarButton, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('Profile')}
+            accessibilityRole="button"
+            accessibilityLabel="Your profile"
+          >
+            <Text style={styles.avatarText}>{initialsOf(user?.name ?? '')}</Text>
+          </Pressable>
           <View style={styles.greetingWrap}>
-            <Text style={styles.greetingLabel}>Hello, {firstName} 👋</Text>
+            <Text style={styles.greetingLine}>{greetingFor(now)}</Text>
+            <Text style={styles.greetingName} numberOfLines={1}>
+              {firstName}
+            </Text>
             {viewingMember ? (
               <Pressable onPress={openFamily} hitSlop={6} style={styles.viewingRow}>
                 <Text style={styles.viewingText} numberOfLines={1}>
@@ -81,12 +163,12 @@ export default function HomeScreen({ navigation }: Props) {
                 <Ionicons name="chevron-forward" size={14} color={colors.green} />
               </Pressable>
             ) : (
-              <Text style={styles.greetingSubtitle}>How can we help you today?</Text>
+              <Text style={styles.dateLine}>{formatLongDate(now)}</Text>
             )}
           </View>
           <View style={styles.headerActions}>
             <Pressable
-              style={({ pressed }) => [styles.sosButton, pressed && styles.cardPressed]}
+              style={({ pressed }) => [styles.sosButton, pressed && styles.pressed]}
               onPress={() => navigation.navigate('Sos')}
               accessibilityRole="button"
               accessibilityLabel="SOS emergency"
@@ -105,113 +187,63 @@ export default function HomeScreen({ navigation }: Props) {
                 </View>
               )}
             </Pressable>
+          </View>
+        </View>
+
+        <BloodAlertCard
+          matches={bloodAlerts.matches}
+          mine={bloodAlerts.mine}
+          onOpen={(requestId) => navigation.navigate('HelpRequest', { requestId })}
+          onSeeAll={() => navigation.navigate('Community')}
+        />
+
+        {nextReminder && (
+          <Pressable
+            style={({ pressed }) => [styles.nextCard, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('Reminders')}
+          >
+            <View style={styles.nextIcon}>
+              <Ionicons name="alarm-outline" size={20} color="#FFFFFF" />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.nextLabel}>NEXT REMINDER · {formatReminderTime(nextReminder.at).toUpperCase()}</Text>
+              <Text style={styles.nextTitle} numberOfLines={1}>
+                {nextReminder.title}
+              </Text>
+              {!!nextReminder.body && (
+                <Text style={styles.nextBody} numberOfLines={1}>
+                  {nextReminder.body}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </Pressable>
+        )}
+
+        <View style={styles.quickRow}>
+          {QUICK_ACTIONS.map((a) => (
             <Pressable
-              style={({ pressed }) => [styles.avatarButton, pressed && styles.cardPressed]}
-              onPress={() => navigation.navigate('Profile')}
+              key={a.screen}
+              style={({ pressed }) => [styles.quickItem, pressed && styles.pressed]}
+              onPress={() => navigation.navigate(a.screen)}
               accessibilityRole="button"
-              accessibilityLabel="Your profile"
+              accessibilityLabel={a.label}
             >
-              <Text style={styles.avatarText}>{initialsOf(user?.name ?? '')}</Text>
+              <View style={[styles.quickIcon, { backgroundColor: a.bg }]}>
+                <Ionicons name={a.icon} size={24} color={a.tint} />
+              </View>
+              <Text style={styles.quickLabel} numberOfLines={1}>
+                {a.label}
+              </Text>
+              <Text style={styles.quickHint} numberOfLines={1}>
+                {a.hint}
+              </Text>
             </Pressable>
-          </View>
+          ))}
         </View>
-
-        <View style={styles.promoRow}>
-          <Pressable
-            style={({ pressed }) => [styles.promoCard, pressed && styles.cardPressed]}
-            onPress={() => navigation.navigate('HealthRecords')}
-          >
-            <View style={[styles.promoIcon, { backgroundColor: colors.badge.greenBg }]}>
-              <Ionicons name="document-text-outline" size={22} color={colors.badge.greenIcon} />
-            </View>
-            <Text style={styles.promoTitle}>Health Records</Text>
-            <Text style={styles.promoSubtitle}>
-              {activeProfile && !activeProfile.isSelf ? `${possessive(activeProfile)} vitals & documents` : 'Track your vitals & documents'}
-            </Text>
-            <Text style={styles.promoLink}>View Records →</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.promoCard, pressed && styles.cardPressed]}
-            onPress={() => navigation.navigate('Challenges')}
-          >
-            <View style={[styles.promoIcon, { backgroundColor: colors.badge.orangeBg }]}>
-              <Ionicons name="walk-outline" size={22} color={colors.badge.orangeIcon} />
-            </View>
-            <Text style={styles.promoTitle}>Challenges</Text>
-            <Text style={styles.promoSubtitle}>Join fitness challenges</Text>
-            <Text style={styles.promoLink}>Join Now →</Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.cardPressed]}
-          onPress={() => navigation.getParent()?.navigate('Watch' as never)}
-        >
-          <View style={[styles.rowIcon, { backgroundColor: colors.badge.greenBg }]}>
-            <Ionicons name="watch-outline" size={22} color={colors.badge.greenIcon} />
-          </View>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowTitle}>Smartwatch data</Text>
-            <Text style={styles.rowSubtitle}>Heart rate, SpO2, sleep & more from your watch</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.cardPressed]}
-          onPress={() => navigation.navigate('FollowUps')}
-        >
-          <View style={[styles.rowIcon, { backgroundColor: colors.badge.purpleBg }]}>
-            <Ionicons name="calendar-outline" size={22} color={colors.badge.purpleIcon} />
-          </View>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowTitle}>Follow-ups</Text>
-            <Text style={styles.rowSubtitle}>Appointments, tests & medication reminders</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.cardPressed]}
-          onPress={() => navigation.navigate('Expenses')}
-        >
-          <View style={[styles.rowIcon, { backgroundColor: colors.badge.greenBg }]}>
-            <Ionicons name="wallet-outline" size={22} color={colors.badge.greenIcon} />
-          </View>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowTitle}>Medical Expenses</Text>
-            <Text style={styles.rowSubtitle}>Track bills, medicines & healthcare costs</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.cardPressed]}
-          onPress={() => navigation.navigate('Directory')}
-        >
-          <View style={[styles.rowIcon, { backgroundColor: colors.badge.blueBg }]}>
-            <Ionicons name="location-outline" size={22} color={colors.badge.blueIcon} />
-          </View>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowTitle}>Healthcare Directory</Text>
-            <Text style={styles.rowSubtitle}>Find nearby hospitals, clinics & pharmacies</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.row, styles.rowDanger, pressed && styles.cardPressed]}
-          onPress={() => navigation.navigate('Emergency')}
-        >
-          <View style={[styles.rowIcon, { backgroundColor: '#FCE1E1' }]}>
-            <Ionicons name="alert-circle-outline" size={22} color={colors.danger} />
-          </View>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowTitle}>Emergency Assistance</Text>
-            <Text style={styles.rowSubtitle}>Trusted contacts, Medical ID & helplines</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        <Pressable onPress={openCare} hitSlop={8} style={styles.allServices}>
+          <Text style={styles.linkText}>All services in Care</Text>
+          <Ionicons name="arrow-forward" size={14} color={colors.green} />
         </Pressable>
 
         {user && (
@@ -223,11 +255,11 @@ export default function HomeScreen({ navigation }: Props) {
           />
         )}
 
-        <View style={styles.summaryHeaderRow}>
-          <Text style={styles.metricsTitle}>Your health metrics</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Your health metrics</Text>
           {watch && (
             <Pressable onPress={openWatch} hitSlop={8}>
-              <Text style={styles.viewAllLink}>View all →</Text>
+              <Text style={styles.linkText}>View all →</Text>
             </Pressable>
           )}
         </View>
@@ -236,7 +268,7 @@ export default function HomeScreen({ navigation }: Props) {
             {latestMetrics.map(({ def, latest, status }) => (
               <Pressable
                 key={def.key}
-                style={({ pressed }) => [styles.metricCard, pressed && styles.cardPressed]}
+                style={({ pressed }) => [styles.metricCard, pressed && styles.pressed]}
                 onPress={openWatch}
               >
                 <View style={styles.metricTop}>
@@ -259,7 +291,7 @@ export default function HomeScreen({ navigation }: Props) {
             ))}
           </View>
         ) : (
-          <Pressable style={({ pressed }) => [styles.summaryCard, pressed && styles.cardPressed]} onPress={openWatch}>
+          <Pressable style={({ pressed }) => [styles.summaryCard, pressed && styles.pressed]} onPress={openWatch}>
             <Ionicons name="watch-outline" size={20} color={colors.green} />
             <Text style={styles.summaryPlaceholder}>
               {watch
@@ -277,10 +309,17 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background, position: 'relative', overflow: 'hidden' },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
+  flex: { flex: 1 },
+  pressed: { opacity: 0.7 },
+  linkText: { fontSize: 13, fontWeight: '700', color: colors.green },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.lg },
-  greetingLabel: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
-  greetingSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+  greetingWrap: { flex: 1 },
+  greetingLine: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  greetingName: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, marginTop: 1 },
+  dateLine: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  viewingRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
+  viewingText: { flexShrink: 1, fontSize: 13, fontWeight: '700', color: colors.green },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconButton: {
     width: 40, height: 40, borderRadius: 20,
@@ -299,48 +338,46 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: colors.surface,
   },
   bellBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
-  greetingWrap: { flex: 1, marginRight: spacing.sm },
-  viewingRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
-  viewingText: { flexShrink: 1, fontSize: 13, fontWeight: '700', color: colors.green },
   avatarButton: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 3, borderColor: colors.blobLight,
   },
-  avatarText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  avatarText: { color: '#FFFFFF', fontWeight: '800', fontSize: 17 },
 
-  promoRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
-  promoCard: {
-    flex: 1, backgroundColor: colors.surface, borderRadius: 16,
+  nextCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg,
+    backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: spacing.md,
+  },
+  nextIcon: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.badge.orangeIcon,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  nextLabel: { fontSize: 11, fontWeight: '800', color: colors.badge.orangeIcon, letterSpacing: 0.4 },
+  nextTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
+  nextBody: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm },
+  quickItem: {
+    width: '48.5%', backgroundColor: colors.surface, borderRadius: 16,
     borderWidth: 1, borderColor: colors.border, padding: spacing.md,
   },
-  promoIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
-  promoTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  promoSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.sm },
-  promoLink: { fontSize: 12, fontWeight: '700', color: colors.green },
+  quickIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.sm },
+  quickHint: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  allServices: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing.md },
 
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.surface, borderRadius: 16,
-    borderWidth: 1, borderColor: colors.border,
-    padding: spacing.md, marginBottom: spacing.md,
+  sectionHeaderRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: spacing.lg, marginBottom: spacing.sm,
   },
-  rowDanger: { borderColor: '#F3C6C6' },
-  rowIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  rowTextWrap: { flex: 1 },
-  rowTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  rowSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  cardPressed: { opacity: 0.7 },
-
-  summaryHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.sm },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  viewAllLink: { fontSize: 13, fontWeight: '700', color: colors.green },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
   summaryCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surface, borderRadius: 16,
     borderWidth: 1, borderColor: colors.border, padding: spacing.md,
   },
   summaryPlaceholder: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  metricsTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   metricCard: {
     width: '48.5%', backgroundColor: colors.surface, borderRadius: 16,

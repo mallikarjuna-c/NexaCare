@@ -1,17 +1,9 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import {
-  REMINDERS,
-  type NotificationPermissionState,
-  type ReminderKey,
-  type ReminderStatus,
-  type SetReminderResult,
-} from '../types/notifications';
+import { parsePayload, type NotificationPayload, type NotificationPermissionState } from '../types/notifications';
 
 const ANDROID_CHANNEL_ID = 'reminders';
-
-const LEGACY_REMINDER_IDS = ['health-records-daily', 'challenge-daily'];
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -29,7 +21,7 @@ function ensureAndroidChannel(): Promise<void> {
   if (!channelReady) {
     channelReady = Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
       name: 'Reminders',
-      description: 'Daily health and challenge reminders',
+      description: 'Medicine, check-up, appointment and habit reminders',
       importance: Notifications.AndroidImportance.HIGH,
     })
       .then(() => undefined)
@@ -66,28 +58,14 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return toPermissionState(await Notifications.requestPermissionsAsync());
 }
 
-export async function scheduleDailyReminder(
+export async function scheduleReminderAt(
   identifier: string,
   title: string,
   body: string,
-  hour: number,
-  minute: number
+  date: Date,
+  data?: NotificationPayload,
+  categoryIdentifier?: string
 ): Promise<string> {
-  await ensureAndroidChannel();
-  await cancelReminder(identifier);
-  return Notifications.scheduleNotificationAsync({
-    identifier,
-    content: { title, body },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-      channelId: ANDROID_CHANNEL_ID,
-    },
-  });
-}
-
-export async function scheduleReminderAt(identifier: string, title: string, body: string, date: Date): Promise<string> {
   if (date.getTime() <= Date.now()) {
     throw new Error('Reminder time must be in the future.');
   }
@@ -95,23 +73,10 @@ export async function scheduleReminderAt(identifier: string, title: string, body
   await cancelReminder(identifier);
   return Notifications.scheduleNotificationAsync({
     identifier,
-    content: { title, body },
+    content: { title, body, data: data ?? {}, ...(categoryIdentifier ? { categoryIdentifier } : {}) },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date,
-      channelId: ANDROID_CHANNEL_ID,
-    },
-  });
-}
-
-export async function scheduleOneTimeReminder(title: string, body: string, secondsFromNow: number): Promise<string> {
-  await ensureAndroidChannel();
-  return Notifications.scheduleNotificationAsync({
-    content: { title, body },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: secondsFromNow,
-      repeats: false,
       channelId: ANDROID_CHANNEL_ID,
     },
   });
@@ -128,35 +93,48 @@ export async function getScheduledReminders() {
   return Notifications.getAllScheduledNotificationsAsync();
 }
 
-export async function getReminderStatus(userId: string): Promise<ReminderStatus> {
-  const scheduled = await getScheduledReminders();
-  const ids = new Set(scheduled.map((request) => request.identifier));
+export type UpcomingReminder = {
+  identifier: string;
+  title: string;
+  body: string;
+  at: Date;
+  repeatsDaily: boolean;
+  payload: NotificationPayload;
+};
 
-  await Promise.all(LEGACY_REMINDER_IDS.filter((id) => ids.has(id)).map(cancelReminder));
-
-  const status = {} as ReminderStatus;
-  for (const reminder of REMINDERS) {
-    status[reminder.key] = ids.has(userScopedId(userId, reminder.key));
+function nextFireTime(trigger: unknown, now = new Date()): { at: Date; repeatsDaily: boolean } | null {
+  if (!trigger || typeof trigger !== 'object') return null;
+  const t = trigger as Record<string, unknown>;
+  if (t.type === 'daily' && typeof t.hour === 'number' && typeof t.minute === 'number') {
+    const at = new Date(now);
+    at.setHours(t.hour, t.minute, 0, 0);
+    if (at <= now) at.setDate(at.getDate() + 1);
+    return { at, repeatsDaily: true };
   }
-  return status;
+  const raw = typeof t.value === 'number' ? t.value : t.date instanceof Date ? t.date.getTime() : typeof t.date === 'number' ? t.date : null;
+  if (raw == null) return null;
+  const at = new Date(raw);
+  return at > now ? { at, repeatsDaily: false } : null;
 }
 
-export async function setReminderEnabled(userId: string, key: ReminderKey, enabled: boolean): Promise<SetReminderResult> {
-  const identifier = userScopedId(userId, key);
-
-  if (!enabled) {
-    await cancelReminder(identifier);
-    return { ok: true };
-  }
-
-  const permission = await requestNotificationPermission();
-  if (permission !== 'granted') return { ok: false, reason: permission };
-
-  const reminder = REMINDERS.find((r) => r.key === key);
-  if (!reminder) throw new Error(`Unknown reminder: ${key}`);
-
-  await scheduleDailyReminder(identifier, reminder.notificationTitle, reminder.notificationBody, reminder.hour, reminder.minute);
-  return { ok: true };
+export async function getUpcomingReminders(userId: string): Promise<UpcomingReminder[]> {
+  const prefix = userScopedId(userId, '');
+  const scheduled = await getScheduledReminders();
+  return scheduled
+    .filter((request) => request.identifier.startsWith(prefix))
+    .flatMap((request) => {
+      const next = nextFireTime(request.trigger);
+      if (!next) return [];
+      return [{
+        identifier: request.identifier,
+        title: request.content.title ?? 'Reminder',
+        body: request.content.body ?? '',
+        at: next.at,
+        repeatsDaily: next.repeatsDaily,
+        payload: parsePayload(request.content.data),
+      }];
+    })
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
 export async function cancelAllRemindersForUser(userId: string): Promise<void> {

@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from auth import current_user
 from db import Link, ProfileData, User, get_db
 
-Collection = Literal["records", "followups", "expenses", "medical", "watch"]
-MAX_BYTES = 2_000_000
+Collection = Literal["records", "followups", "expenses", "medical", "watch", "backup", "reminders", "reminder_logs", "challenges"]
+OWNER_ONLY = {"backup"}
+MAX_BYTES = 5_000_000
 
 router = APIRouter(prefix="/profiles", tags=["data"])
 
@@ -39,7 +40,7 @@ def read_data(
     profile_id: str, collection: Collection, user: User = Depends(current_user), db: Session = Depends(get_db)
 ) -> DataOut:
     level = access_level(db, user, profile_id)
-    if not level:
+    if not level or (collection in OWNER_ONLY and level != "owner"):
         raise HTTPException(404, "You don't have access to this person's data.")
     row = db.get(ProfileData, (profile_id, collection))
     return DataOut(exists=row is not None, data=json.loads(row.data) if row else None, access=level)
@@ -55,6 +56,8 @@ def write_data(
 ) -> DataOut:
     level = access_level(db, user, profile_id)
     if not level:
+        raise HTTPException(404, "You don't have access to this person's data.")
+    if collection in OWNER_ONLY and level != "owner":
         raise HTTPException(404, "You don't have access to this person's data.")
     if level == "view" or (collection == "watch" and level != "owner"):
         raise HTTPException(403, "You can view this person's data but not change it.")

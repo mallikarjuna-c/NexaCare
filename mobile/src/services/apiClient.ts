@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const DEFAULT_API_URL = 'http://localhost:8010';
+export const DEFAULT_API_URL: string = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8010';
 const TOKEN_KEY = 'nexacare_auth_token';
 const API_URL_KEY = 'nexacare_api_url';
 const DEFAULT_TIMEOUT_MS = 20_000;

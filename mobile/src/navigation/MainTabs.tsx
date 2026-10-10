@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
 import { getFocusedRouteNameFromRoute, type NavigatorScreenParams } from '@react-navigation/native';
-import HomeStackNavigator, { type HomeStackParamList } from './HomeStack';
+import HomeStackNavigator, { CareStackNavigator, type HomeStackParamList } from './HomeStack';
 import AssistantScreen from '../screens/AssistantScreen';
 import SmartwatchScreen from '../screens/SmartwatchScreen';
 import FamilyStackNavigator, { type FamilyStackParamList } from './FamilyStack';
@@ -13,6 +13,7 @@ const TAB_BAR_HEIGHT = 64;
 
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
+  Care: NavigatorScreenParams<HomeStackParamList> | undefined;
   Watch: undefined;
   Assistant: undefined;
   Family: NavigatorScreenParams<FamilyStackParamList> | undefined;
@@ -47,6 +48,15 @@ export default function MainTabs() {
         options={({ route }) => ({
           title: 'Home',
           tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          tabBarStyle: getFocusedRouteNameFromRoute(route) === 'Sos' ? { display: 'none' } : tabBarStyle,
+        })}
+      />
+      <Tab.Screen
+        name="Care"
+        component={CareStackNavigator}
+        options={({ route }) => ({
+          title: 'Care',
+          tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />,
           tabBarStyle: getFocusedRouteNameFromRoute(route) === 'Sos' ? { display: 'none' } : tabBarStyle,
         })}
       />

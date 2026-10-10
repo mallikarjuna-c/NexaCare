@@ -6,6 +6,8 @@ import { removeFaceScanData } from '../services/legacyDataService';
 import { getFamilyMembers } from '../services/familyService';
 import { setSessionUser } from '../services/profileStore';
 import { getMedicalInfo } from '../services/emergencyService';
+import { backupPhoneData, restorePhoneData } from '../services/backupService';
+import { unregisterPush } from '../services/pushService';
 import type { User, AuthContextType } from '../types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,21 +37,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch((e) => console.warn('Could not restore follow-up reminders', e));
     removeFaceScanData(userId).catch(() => {});
     getMedicalInfo(userId).catch(() => {});
+    restorePhoneData(userId)
+      .catch(() => 0)
+      .then(() => backupPhoneData(userId))
+      .catch((e) => console.warn('Could not back up phone data', e));
   }, [userId]);
 
+  const startSession = async (next: User) => {
+    setSessionUser(next.id);
+    await restorePhoneData(next.id).catch((e) => console.warn('Could not restore phone data', e));
+    applyUser(next);
+  };
+
   const login = async (email: string, password: string) => {
-    const loggedInUser = await authService.login(email, password);
-    applyUser(loggedInUser);
+    await startSession(await authService.login(email, password));
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    const newUser = await authService.signup(name, email, password);
-    applyUser(newUser);
+    await startSession(await authService.signup(name, email, password));
   };
 
   const logout = async () => {
     if (user) {
       await cancelAllRemindersForUser(user.id).catch((e) => console.warn('Could not cancel reminders on logout', e));
+      await unregisterPush().catch(() => {});
     }
     await authService.logout();
     applyUser(null);

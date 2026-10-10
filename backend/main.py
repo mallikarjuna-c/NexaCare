@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from auth import current_user, router as auth_router
 from data import router as data_router
 from links import router as links_router
+from community import router as community_router
 from db import User, init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +59,7 @@ app = FastAPI(title="NexaCare API")
 app.include_router(auth_router)
 app.include_router(data_router)
 app.include_router(links_router)
+app.include_router(community_router)
 
 
 def api_key() -> str:
